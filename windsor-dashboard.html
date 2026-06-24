@@ -1,0 +1,325 @@
+<!DOCTYPE html>
+<html lang="th">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Windsor Media Dashboard</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Hanken+Grotesk:wght@400;500;600;700&family=Noto+Sans+Thai:wght@400;500;600;700&display=swap" rel="stylesheet">
+<script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.1/dist/chart.umd.min.js"></script>
+<style>
+  :root{
+    /* Windsor Light Analytics — Paper & Ink */
+    --bg-base:#f8fafc; --surface-card:#ffffff;
+    --surface-low:#f2f4f6; --surface-hover:#eceef0;
+    --border-subtle:#e2e8f0; --outline-variant:#c6c6ce;
+    --text-primary:#0f172a; --text-muted:#64748b;
+    --primary:#162139; --secondary:#3255c6; --secondary-soft:#6c8cff;
+    --success:#10b981; --error:#ef4444;
+    --fb:#4267B2; --tt:#25F4EE; --tw:#1DA1F2; --other:#94a3b8;
+  }
+  *{box-sizing:border-box;margin:0;padding:0}
+  body{
+    font-family:'Hanken Grotesk','Noto Sans Thai',system-ui,sans-serif;
+    background:var(--bg-base);color:var(--text-primary);
+    padding:24px;min-height:100vh;-webkit-font-smoothing:antialiased;
+  }
+  h1{font-size:24px;font-weight:700;letter-spacing:.3px;line-height:32px}
+  .sub{color:var(--text-muted);font-size:13px;margin-top:4px}
+  header{display:flex;justify-content:space-between;align-items:flex-start;flex-wrap:wrap;gap:16px;margin-bottom:24px}
+  .controls{display:flex;gap:10px;flex-wrap:wrap;align-items:center}
+  select{background:var(--surface-card);color:var(--text-primary);border:1px solid var(--border-subtle);border-radius:8px;padding:9px 12px;font:inherit;font-size:13px;cursor:pointer}
+  select:hover{background:var(--bg-base);border-color:var(--outline-variant)}
+  button{background:var(--secondary);color:#fff;border:1px solid var(--secondary);border-radius:8px;padding:9px 16px;font:inherit;font-size:13px;font-weight:600;cursor:pointer}
+  button:hover{background:#2746a8}
+  button.btn-secondary{background:var(--surface-card);color:var(--text-primary);border:1px solid var(--border-subtle)}
+  button.btn-secondary:hover{background:var(--bg-base);border-color:var(--outline-variant)}
+  .chips{display:flex;gap:8px;flex-wrap:wrap;margin-bottom:20px}
+  .chip{padding:6px 14px;border-radius:9999px;border:1px solid var(--border-subtle);background:var(--surface-card);font-size:12px;font-weight:500;cursor:pointer;user-select:none;display:flex;align-items:center;gap:7px;transition:.15s}
+  .chip.off{opacity:.45;background:var(--surface-low)}
+  .dot{width:9px;height:9px;border-radius:50%}
+  .kpis{display:grid;grid-template-columns:repeat(auto-fit,minmax(160px,1fr));gap:16px;margin-bottom:24px}
+  .kpi{background:var(--surface-card);border:1px solid var(--border-subtle);border-radius:12px;padding:18px}
+  .kpi .label{color:var(--text-muted);font-size:11px;font-weight:600;text-transform:uppercase;letter-spacing:.5px}
+  .kpi .val{font-size:28px;font-weight:700;line-height:34px;letter-spacing:-.5px;margin-top:8px}
+  .kpi .unit{font-size:14px;color:var(--text-muted);font-weight:400}
+  .grid{display:grid;grid-template-columns:2fr 1fr;gap:16px;margin-bottom:16px}
+  .grid.grid-2{grid-template-columns:1fr 1fr}
+  @media(max-width:900px){.grid,.grid.grid-2{grid-template-columns:1fr}}
+  .panel{background:var(--surface-card);border:1px solid var(--border-subtle);border-radius:12px;padding:20px}
+  .panel h3{font-size:14px;font-weight:600;line-height:20px;margin-bottom:16px}
+  table{width:100%;border-collapse:collapse;font-size:13px}
+  th,td{text-align:right;padding:10px 10px;border-bottom:1px solid var(--border-subtle)}
+  th:first-child,td:first-child{text-align:left}
+  th{color:var(--text-muted);font-weight:600;font-size:11px;text-transform:uppercase;letter-spacing:.5px;cursor:pointer;white-space:nowrap}
+  th:hover{color:var(--secondary)}
+  tbody tr:hover{background:var(--bg-base)}
+  td.camp{max-width:420px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+  .src-tag{display:inline-block;padding:2px 9px;border-radius:9999px;font-size:11px;font-weight:600}
+  .loading,.error{text-align:center;padding:60px;color:var(--text-muted)}
+  .error{color:var(--error)}
+  canvas{max-height:300px}
+  .footnote{color:var(--text-muted);font-size:11px;margin-top:10px}
+</style>
+</head>
+<body>
+<header>
+  <div>
+    <h1>📊 Windsor Media Dashboard</h1>
+    <div class="sub" id="rangeLabel">กำลังโหลด…</div>
+  </div>
+  <div class="controls">
+    <select id="datePreset">
+      <option value="last_7d" selected>7 วันล่าสุด</option>
+      <option value="last_14d">14 วันล่าสุด</option>
+      <option value="last_30d">30 วันล่าสุด</option>
+      <option value="this_month">เดือนนี้</option>
+      <option value="last_month">เดือนที่แล้ว</option>
+    </select>
+    <button id="keyBtn" class="btn-secondary">🔑 Key</button>
+    <button id="refresh">🔄 รีเฟรช</button>
+  </div>
+</header>
+
+<div class="chips" id="srcChips"></div>
+
+<div id="content">
+  <div class="loading">กำลังดึงข้อมูลจาก Windsor…</div>
+</div>
+
+<script>
+/* ============================================================
+   CONFIG
+   Windsor API key ไม่ได้ฝังในไฟล์ (กัน key รั่วบน repo public)
+   key เก็บใน localStorage ของเบราว์เซอร์ — กรอกครั้งแรกครั้งเดียว
+   กดปุ่ม "🔑 Key" เพื่อเปลี่ยน/ลบ key ได้ทุกเมื่อ
+   ============================================================ */
+const FIELDS  = "source,campaign,clicks,spend,impressions,reach,date";
+const ENDPOINT = "https://connectors.windsor.ai/all";
+const KEY_STORE = "windsor_api_key";
+let API_KEY = localStorage.getItem(KEY_STORE) || "";
+
+function ensureKey(force){
+  if(!API_KEY || force){
+    const k = prompt("กรอก Windsor API key:", API_KEY || "");
+    if(k && k.trim()){ API_KEY = k.trim(); localStorage.setItem(KEY_STORE, API_KEY); return true; }
+    return !!API_KEY;
+  }
+  return true;
+}
+
+const SRC_COLORS = {facebook:"#4267B2", tiktok:"#0ea5b5", twitter:"#1DA1F2", other:"#94a3b8"};
+const CHART_GRID = "#e2e8f0", CHART_TICK = "#64748b";
+let rawData = [];
+let wowRaw = [];
+let activeSources = new Set();
+let sortKey = "spend", sortDir = -1;
+let charts = [];
+
+const fmtInt = n => Math.round(n).toLocaleString("en-US");
+const fmtMoney = n => "฿" + Math.round(n).toLocaleString("en-US");
+const fmtPct = n => (n*100).toFixed(2)+"%";
+const norm = s => (s && s.trim()) ? s : "other";
+
+async function load(){
+  if(!ensureKey(false)){
+    document.getElementById("content").innerHTML =
+      '<div class="error">ยังไม่มี API key — กดปุ่ม “🔑 Key” มุมขวาบนเพื่อกรอก</div>';
+    return;
+  }
+  const preset = document.getElementById("datePreset").value;
+  document.getElementById("content").innerHTML = '<div class="loading">กำลังดึงข้อมูลจาก Windsor…</div>';
+  const url = `${ENDPOINT}?api_key=${API_KEY}&date_preset=${preset}&fields=${FIELDS}`;
+  try{
+    const res = await fetch(url);
+    if(!res.ok) throw new Error("HTTP "+res.status);
+    const json = await res.json();
+    rawData = (json.data||[]).map(r=>({
+      source: norm(r.source),
+      campaign: r.campaign || "(ไม่ระบุแคมเปญ)",
+      clicks: +r.clicks||0, spend:+r.spend||0,
+      impressions:+r.impressions||0, reach:+r.reach||0, date:r.date
+    }));
+    const srcs = [...new Set(rawData.map(r=>r.source))];
+    if(activeSources.size===0) srcs.forEach(s=>activeSources.add(s));
+    renderChips(srcs);
+    // ดึง 14 วันแยกต่างหาก สำหรับกราฟเปรียบเทียบรายสัปดาห์ (week-over-week)
+    try{
+      const wres = await fetch(`${ENDPOINT}?api_key=${API_KEY}&date_preset=last_14d&fields=source,spend,impressions,date`);
+      const wjson = await wres.json();
+      wowRaw = (wjson.data||[]).map(r=>({source:norm(r.source),spend:+r.spend||0,impressions:+r.impressions||0,date:r.date}));
+    }catch(e){ wowRaw=[]; }
+    render();
+  }catch(e){
+    document.getElementById("content").innerHTML =
+      `<div class="error">❌ ดึงข้อมูลไม่สำเร็จ: ${e.message}<br><span class="footnote">ตรวจสอบ API key / การเชื่อมต่ออินเทอร์เน็ต</span></div>`;
+  }
+}
+
+function renderChips(srcs){
+  const c = document.getElementById("srcChips");
+  c.innerHTML = "";
+  srcs.forEach(s=>{
+    const on = activeSources.has(s);
+    const el = document.createElement("div");
+    el.className = "chip"+(on?"":" off");
+    el.innerHTML = `<span class="dot" style="background:${SRC_COLORS[s]||SRC_COLORS.other}"></span>${s}`;
+    el.onclick = ()=>{ on?activeSources.delete(s):activeSources.add(s); renderChips(srcs); render(); };
+    c.appendChild(el);
+  });
+}
+
+function render(){
+  charts.forEach(c=>c.destroy()); charts=[];
+  const data = rawData.filter(r=>activeSources.has(r.source));
+  const dates = [...new Set(rawData.map(r=>r.date))].sort();
+  document.getElementById("rangeLabel").textContent =
+    dates.length ? `${dates[0]} → ${dates[dates.length-1]} · ${data.length} แถว` : "ไม่มีข้อมูล";
+
+  const sum = data.reduce((a,r)=>{a.spend+=r.spend;a.impr+=r.impressions;a.reach+=r.reach;a.clicks+=r.clicks;return a;},
+                          {spend:0,impr:0,reach:0,clicks:0});
+  const cpm = sum.impr? sum.spend/sum.impr*1000 : 0;
+  const cpc = sum.clicks? sum.spend/sum.clicks : 0;
+  const ctr = sum.impr? sum.clicks/sum.impr : 0;
+
+  document.getElementById("content").innerHTML = `
+    <div class="kpis">
+      ${kpi("ค่าโฆษณา", fmtMoney(sum.spend))}
+      ${kpi("Impressions", fmtInt(sum.impr))}
+      ${kpi("Reach", fmtInt(sum.reach))}
+      ${kpi("Clicks", fmtInt(sum.clicks))}
+      ${kpi("CPM", fmtMoney(cpm))}
+      ${kpi("CPC", "฿"+cpc.toFixed(2))}
+      ${kpi("CTR", fmtPct(ctr))}
+    </div>
+    <div class="grid">
+      <div class="panel"><h3>แนวโน้มรายวัน — Spend &amp; Impressions</h3><canvas id="trend"></canvas></div>
+      <div class="panel"><h3>สัดส่วน Spend ตาม Source</h3><canvas id="pie"></canvas></div>
+    </div>
+    <div class="grid grid-2">
+      <div class="panel"><h3>เปรียบเทียบรายสัปดาห์ — Spend</h3><canvas id="wowSpend"></canvas></div>
+      <div class="panel"><h3>เปรียบเทียบรายสัปดาห์ — Impressions</h3><canvas id="wowImpr"></canvas></div>
+    </div>
+    <div class="panel">
+      <h3>Performance ตามแคมเปญ (Top 50)</h3>
+      <div style="overflow-x:auto">
+        <table id="tbl"><thead><tr>
+          ${th("campaign","แคมเปญ")}${th("source","Source")}${th("spend","Spend")}
+          ${th("impressions","Impr.")}${th("reach","Reach")}${th("clicks","Clicks")}
+          ${th("cpm","CPM")}${th("ctr","CTR")}
+        </tr></thead><tbody></tbody></table>
+      </div>
+      <div class="footnote">คลิกหัวคอลัมน์เพื่อจัดเรียง · conversions/revenue ไม่แสดง เพราะแคมเปญเป็นงาน Brand/Reach</div>
+    </div>`;
+
+  drawTrend(data, dates);
+  drawPie(data);
+  drawWoW();
+  drawTable(data);
+}
+
+function drawWoW(){
+  const data = wowRaw.filter(r=>activeSources.has(r.source));
+  const dates = [...new Set(data.map(r=>r.date))].sort();
+  // แบ่งครึ่ง: ครึ่งหลัง = สัปดาห์ล่าสุด, ครึ่งแรก = สัปดาห์ก่อนหน้า
+  const half = Math.ceil(dates.length/2);
+  const latestSet = new Set(dates.slice(-half));
+  const prevSet = new Set(dates.slice(0, dates.length-half));
+  const sum = (set,key)=>data.reduce((a,r)=>a+(set.has(r.date)?r[key]:0),0);
+  const spendPrev=sum(prevSet,"spend"), spendLast=sum(latestSet,"spend");
+  const imprPrev=sum(prevSet,"impressions"), imprLast=sum(latestSet,"impressions");
+
+  charts.push(makeWoW("wowSpend",[spendPrev,spendLast],["#a5b1d6","#3255c6"],true));
+  charts.push(makeWoW("wowImpr",[imprPrev,imprLast],["#cbd5e1","#10b981"],false));
+}
+
+function makeWoW(id,vals,colors,isMoney){
+  return new Chart(document.getElementById(id),{
+    type:"bar",
+    data:{labels:["สัปดาห์ก่อนหน้า","สัปดาห์ล่าสุด"],
+      datasets:[{data:vals,backgroundColor:colors,borderRadius:4,maxBarThickness:80}]},
+    options:{responsive:true,
+      plugins:{legend:{display:false},
+        tooltip:{callbacks:{label:c=>(isMoney?"฿":"")+Math.round(c.parsed.y).toLocaleString("en-US")}}},
+      scales:{
+        x:{ticks:{color:CHART_TICK,font:{family:'Hanken Grotesk'}},grid:{display:false}},
+        y:{beginAtZero:true,ticks:{color:CHART_TICK,callback:v=>v.toLocaleString("en-US")},grid:{color:CHART_GRID}}
+      }}
+  });
+}
+
+const kpi = (l,v)=>`<div class="kpi"><div class="label">${l}</div><div class="val">${v}</div></div>`;
+const th  = (k,l)=>`<th data-k="${k}" onclick="sortBy('${k}')">${l}${sortKey===k?(sortDir<0?' ▾':' ▴'):''}</th>`;
+
+function drawTrend(data, dates){
+  const byDate = {};
+  dates.forEach(d=>byDate[d]={spend:0,impr:0});
+  data.forEach(r=>{ if(byDate[r.date]){byDate[r.date].spend+=r.spend; byDate[r.date].impr+=r.impressions;} });
+  charts.push(new Chart(document.getElementById("trend"),{
+    data:{labels:dates,datasets:[
+      {type:"bar",label:"Spend (฿)",data:dates.map(d=>byDate[d].spend),backgroundColor:"#6c8cff",yAxisID:"y",borderRadius:4,maxBarThickness:34},
+      {type:"line",label:"Impressions",data:dates.map(d=>byDate[d].impr),borderColor:"#10b981",backgroundColor:"#10b981",yAxisID:"y1",tension:.3,pointRadius:3,borderWidth:2}
+    ]},
+    options:{responsive:true,interaction:{mode:"index",intersect:false},
+      plugins:{legend:{labels:{color:CHART_TICK,font:{family:'Hanken Grotesk'}}}},
+      scales:{
+        x:{ticks:{color:CHART_TICK},grid:{color:CHART_GRID}},
+        y:{position:"left",ticks:{color:"#3255c6"},grid:{color:CHART_GRID}},
+        y1:{position:"right",ticks:{color:"#10b981"},grid:{drawOnChartArea:false}}
+      }}
+  }));
+}
+
+function drawPie(data){
+  const by={}; data.forEach(r=>by[r.source]=(by[r.source]||0)+r.spend);
+  const labels=Object.keys(by);
+  charts.push(new Chart(document.getElementById("pie"),{
+    type:"doughnut",
+    data:{labels,datasets:[{data:labels.map(l=>by[l]),
+      backgroundColor:labels.map(l=>SRC_COLORS[l]||SRC_COLORS.other),borderColor:"#ffffff",borderWidth:3}]},
+    options:{plugins:{legend:{position:"bottom",labels:{color:CHART_TICK,padding:14,font:{family:'Hanken Grotesk'}}}}}
+  }));
+}
+
+function drawTable(data){
+  const agg={};
+  data.forEach(r=>{
+    const k=r.campaign+"|"+r.source;
+    if(!agg[k]) agg[k]={campaign:r.campaign,source:r.source,spend:0,impressions:0,reach:0,clicks:0};
+    agg[k].spend+=r.spend; agg[k].impressions+=r.impressions; agg[k].reach+=r.reach; agg[k].clicks+=r.clicks;
+  });
+  let rows=Object.values(agg).map(r=>({...r,
+    cpm:r.impressions?r.spend/r.impressions*1000:0,
+    ctr:r.impressions?r.clicks/r.impressions:0}));
+  rows.sort((a,b)=>{
+    let x=a[sortKey],y=b[sortKey];
+    if(typeof x==="string") return sortDir*x.localeCompare(y);
+    return sortDir*(x-y);
+  });
+  rows=rows.slice(0,50);
+  const tb=document.querySelector("#tbl tbody");
+  tb.innerHTML=rows.map(r=>`<tr>
+    <td class="camp" title="${r.campaign.replace(/"/g,'&quot;')}">${r.campaign}</td>
+    <td><span class="src-tag" style="background:${(SRC_COLORS[r.source]||SRC_COLORS.other)}1a;color:${SRC_COLORS[r.source]||SRC_COLORS.other}">${r.source}</span></td>
+    <td>${fmtMoney(r.spend)}</td>
+    <td>${fmtInt(r.impressions)}</td>
+    <td>${fmtInt(r.reach)}</td>
+    <td>${fmtInt(r.clicks)}</td>
+    <td>${fmtMoney(r.cpm)}</td>
+    <td>${fmtPct(r.ctr)}</td>
+  </tr>`).join("");
+}
+
+function sortBy(k){
+  if(sortKey===k) sortDir*=-1; else {sortKey=k; sortDir=-1;}
+  render();
+}
+
+document.getElementById("refresh").onclick = load;
+document.getElementById("datePreset").onchange = load;
+document.getElementById("keyBtn").onclick = ()=>{ if(ensureKey(true)) load(); };
+load();
+</script>
+</body>
+</html>

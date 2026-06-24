@@ -1,0 +1,4 @@
+# reference assets / local tooling
+_stitch_ref/
+.claude/
+*.zip
