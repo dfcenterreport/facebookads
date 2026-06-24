@@ -1,12 +1,12 @@
 {
   "name": "windsor-dashboard",
   "version": "1.0.0",
-  "description": "Windsor media dashboard (static site served via serve)",
+  "description": "Windsor media dashboard (Node proxy + static server)",
   "scripts": {
-    "start": "serve -s . -l ${PORT:-3000}"
+    "start": "node server.js"
   },
   "dependencies": {
-    "serve": "^14.2.4"
+    "express": "^4.19.2"
   },
   "engines": {
     "node": ">=18"

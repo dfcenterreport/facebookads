@@ -1,0 +1,487 @@
+<!DOCTYPE html>
+
+<html class="light" lang="en"><head>
+<meta charset="utf-8"/>
+<meta content="width=device-width, initial-scale=1.0" name="viewport"/>
+<title>AdQuant Analytics | Dashboard</title>
+<!-- Material Symbols -->
+<link href="https://fonts.googleapis.com/css2?family=Material+Symbols+Outlined:wght,FILL@100..700,0..1&amp;display=swap" rel="stylesheet"/>
+<!-- Google Fonts: Hanken Grotesk & Work Sans -->
+<link href="https://fonts.googleapis.com/css2?family=Hanken+Grotesk:wght@400;500;600;700&amp;family=Work+Sans:wght@400;500;600&amp;family=JetBrains+Mono:wght@400;500&amp;display=swap" rel="stylesheet"/>
+<script src="https://cdn.tailwindcss.com?plugins=forms,container-queries"></script>
+<script id="tailwind-config">
+      tailwind.config = {
+        darkMode: "class",
+        theme: {
+          extend: {
+            "colors": {
+                    "on-tertiary-fixed": "#001f23",
+                    "error-container": "#ffdad6",
+                    "on-background": "#1f1b10",
+                    "surface": "#ffffff",
+                    "on-tertiary": "#ffffff",
+                    "outline-variant": "#d0c6ab",
+                    "surface-container-lowest": "#ffffff",
+                    "surface-dim": "#f1f1f1",
+                    "inverse-surface": "#343024",
+                    "tertiary": "#006972",
+                    "tertiary-fixed": "#8bf2ff",
+                    "on-secondary-fixed": "#181c1f",
+                    "surface-container-low": "#f5f5f5",
+                    "on-secondary-container": "#616569",
+                    "surface-container-high": "#e5e5e5",
+                    "on-error-container": "#93000a",
+                    "inverse-on-surface": "#f9f0dd",
+                    "on-primary-fixed-variant": "#554500",
+                    "surface-container": "#f6eddb",
+                    "background": "#ffffff",
+                    "surface-bright": "#ffffff",
+                    "primary-fixed-dim": "#ebc300",
+                    "on-primary-fixed": "#231b00",
+                    "surface-container-highest": "#eae2d0",
+                    "secondary-container": "#fdd205",
+                    "primary-container": "#fdd205",
+                    "tertiary-fixed-dim": "#00dbed",
+                    "on-secondary-fixed-variant": "#43474b",
+                    "on-tertiary-container": "#006770",
+                    "inverse-primary": "#ebc300",
+                    "on-surface": "#1f1b10",
+                    "on-error": "#ffffff",
+                    "on-primary-container": "#6f5b00",
+                    "secondary-fixed": "#dfe3e7",
+                    "surface-variant": "#eae2d0",
+                    "primary": "#715d00",
+                    "brand-yellow": "#fdd205",
+                    "error": "#ba1a1a",
+                    "secondary": "#5b5f63",
+                    "secondary-fixed-dim": "#c3c7cb",
+                    "surface-tint": "#715d00",
+                    "outline": "#7f775f",
+                    "on-secondary": "#ffffff",
+                    "on-primary": "#1f1b10",
+                    "on-surface-variant": "#4d4632",
+                    "primary-fixed": "#ffe178",
+                    "on-tertiary-fixed-variant": "#004f56",
+                    "tertiary-container": "#00ecff",
+                    "border-subtle": "#e2e8f0"
+            },
+            "borderRadius": {
+                    "DEFAULT": "0.125rem",
+                    "lg": "0.25rem",
+                    "xl": "0.5rem",
+                    "full": "0.75rem"
+            },
+            "spacing": {
+                    "margin-desktop": "32px",
+                    "margin-mobile": "16px",
+                    "gutter": "20px",
+                    "xl": "40px",
+                    "sm": "8px",
+                    "lg": "24px",
+                    "md": "16px",
+                    "base": "4px",
+                    "xs": "4px"
+            },
+            "fontFamily": {
+                    "body-lg": ["Work Sans"],
+                    "title-md": ["Hanken Grotesk"],
+                    "headline-lg": ["Hanken Grotesk"],
+                    "body-sm": ["Work Sans"],
+                    "label-caps": ["JetBrains Mono"],
+                    "headline-lg-mobile": ["Hanken Grotesk"],
+                    "display-lg": ["Hanken Grotesk"],
+                    "data-tabular": ["JetBrains Mono"]
+            },
+            "fontSize": {
+                    "body-lg": ["16px", {"lineHeight": "24px", "fontWeight": "400"}],
+                    "title-md": ["20px", {"lineHeight": "28px", "fontWeight": "600"}],
+                    "headline-lg": ["32px", {"lineHeight": "40px", "letterSpacing": "-0.01em", "fontWeight": "600"}],
+                    "body-sm": ["14px", {"lineHeight": "20px", "fontWeight": "400"}],
+                    "label-caps": ["12px", {"lineHeight": "16px", "letterSpacing": "0.05em", "fontWeight": "500"}],
+                    "headline-lg-mobile": ["24px", {"lineHeight": "32px", "fontWeight": "600"}],
+                    "display-lg": ["48px", {"lineHeight": "56px", "letterSpacing": "-0.02em", "fontWeight": "700"}],
+                    "data-tabular": ["14px", {"lineHeight": "20px", "fontWeight": "400"}]
+            }
+          },
+        },
+      }
+    </script>
+<style>
+        body { font-family: 'Work Sans', sans-serif; }
+        h1, h2, h3, h4, .font-headline { font-family: 'Hanken Grotesk', sans-serif; }
+        .material-symbols-outlined {
+            font-variation-settings: 'FILL' 0, 'wght' 400, 'GRAD' 0, 'opsz' 24;
+            vertical-align: middle;
+        }
+        .skeleton {
+            background: linear-gradient(90deg, #f3f4f6 25%, #e5e7eb 50%, #f3f4f6 75%);
+            background-size: 200% 100%;
+            animation: skeleton-loading 1.5s infinite;
+        }
+        @keyframes skeleton-loading {
+            0% { background-position: 200% 0; }
+            100% { background-position: -200% 0; }
+        }
+        .custom-scrollbar::-webkit-scrollbar {
+            width: 4px;
+            height: 4px;
+        }
+        .custom-scrollbar::-webkit-scrollbar-track {
+            background: #ffffff;
+        }
+        .custom-scrollbar::-webkit-scrollbar-thumb {
+            background: #d1d5db;
+            border-radius: 10px;
+        }
+    </style>
+</head>
+<body class="bg-background text-on-background min-h-screen">
+<!-- TopNavBar -->
+<header class="fixed top-0 w-full z-50 flex justify-between items-center px-margin-desktop h-16 bg-surface border-b border-border-subtle">
+<div class="flex items-center gap-8">
+<span class="font-headline-lg text-title-md font-bold text-on-background">AdQuant Analytics</span>
+<nav class="hidden md:flex gap-6">
+<a class="font-body-lg text-body-sm text-on-background border-b-2 border-brand-yellow font-semibold pb-1" href="#">Dashboard</a>
+<a class="font-body-lg text-body-sm text-on-surface-variant hover:text-on-background transition-colors" href="#">Reports</a>
+<a class="font-body-lg text-body-sm text-on-surface-variant hover:text-on-background transition-colors" href="#">Campaigns</a>
+</nav>
+</div>
+<div class="flex items-center gap-4">
+<div class="relative group">
+<button class="p-2 text-on-surface-variant hover:bg-surface-container-low rounded-full transition-colors">
+<span class="material-symbols-outlined">notifications</span>
+</button>
+</div>
+<button class="p-2 text-on-surface-variant hover:bg-surface-container-low rounded-full transition-colors">
+<span class="material-symbols-outlined">settings</span>
+</button>
+<div class="h-8 w-8 rounded-full bg-surface-container-high overflow-hidden border border-border-subtle">
+<img class="w-full h-full object-cover" data-alt="Professional headshot" src="https://lh3.googleusercontent.com/aida-public/AB6AXuBuNCQPG5Xh8ZYu7WStABbPP_X1Lzzkwk3UI_3FP-jmm8k4jUlDKUgAc71zpMhgFnqU7QUgXmlt-VHrG0upq3U7-TWXLuGB1vUIPbYJ-RMiohF4Z3uCSt8L8ReEgcFxLLioPaLjR_uNFtIlU5XjF86hKftTR5xMAtGQEL0T_zyPuY819LrF5j6iVp6APRyXJRbw65Kjc1xcqrrAoE0eVCiwnnANN3M32rYJSGaBGFMQrrkxfa2sfqvAyO9NC0XKy3Now3s0M9rkMFo"/>
+</div>
+</div>
+</header>
+<!-- SideNavBar -->
+<aside class="fixed left-0 top-16 h-[calc(100vh-64px)] w-64 flex flex-col py-6 px-4 bg-surface-container-low border-r border-border-subtle z-40 hidden md:flex">
+<div class="mb-8 px-2">
+<div class="flex items-center gap-3 p-3 bg-surface rounded border border-border-subtle">
+<div class="w-8 h-8 rounded bg-on-background flex items-center justify-center text-surface">
+<span class="material-symbols-outlined text-[20px]" style="font-variation-settings: 'FILL' 1;">corporate_fare</span>
+</div>
+<div>
+<p class="font-label-caps text-[11px] text-on-surface-variant">Global Media Corp</p>
+<p class="text-[10px] text-outline font-medium">882-194</p>
+</div>
+</div>
+</div>
+<nav class="flex-1 space-y-1">
+<a class="flex items-center gap-3 px-4 py-2 bg-brand-yellow text-on-background font-bold rounded group transition-all" href="#">
+<span class="material-symbols-outlined" style="font-variation-settings: 'FILL' 1;">dashboard</span>
+<span class="font-label-caps text-label-caps">Overview</span>
+</a>
+<a class="flex items-center gap-3 px-4 py-2 text-on-surface-variant hover:bg-surface-container-high rounded group transition-all" href="#">
+<span class="material-symbols-outlined">bar_chart</span>
+<span class="font-label-caps text-label-caps">Performance</span>
+</a>
+<a class="flex items-center gap-3 px-4 py-2 text-on-surface-variant hover:bg-surface-container-high rounded group transition-all" href="#">
+<span class="material-symbols-outlined">groups</span>
+<span class="font-label-caps text-label-caps">Audiences</span>
+</a>
+<a class="flex items-center gap-3 px-4 py-2 text-on-surface-variant hover:bg-surface-container-high rounded group transition-all" href="#">
+<span class="material-symbols-outlined">palette</span>
+<span class="font-label-caps text-label-caps">Creative Lab</span>
+</a>
+<a class="flex items-center gap-3 px-4 py-2 text-on-surface-variant hover:bg-surface-container-high rounded group transition-all" href="#">
+<span class="material-symbols-outlined">settings</span>
+<span class="font-label-caps text-label-caps">Settings</span>
+</a>
+</nav>
+<button class="mt-4 w-full py-3 px-4 bg-brand-yellow text-on-background rounded font-bold flex items-center justify-center gap-2 hover:opacity-90 active:scale-[0.98] transition-all">
+<span class="material-symbols-outlined text-[20px]">add</span>
+<span class="font-label-caps text-label-caps">Create Campaign</span>
+</button>
+<div class="mt-auto border-t border-border-subtle pt-6 space-y-1">
+<a class="flex items-center gap-3 px-4 py-2 text-on-surface-variant hover:bg-surface-container-high rounded transition-all" href="#">
+<span class="material-symbols-outlined">help</span>
+<span class="font-label-caps text-label-caps">Help Center</span>
+</a>
+<a class="flex items-center gap-3 px-4 py-2 text-on-surface-variant hover:bg-surface-container-high rounded transition-all" href="#">
+<span class="material-symbols-outlined">contact_support</span>
+<span class="font-label-caps text-label-caps">Support</span>
+</a>
+</div>
+</aside>
+<!-- Main Content Canvas -->
+<main class="md:ml-64 pt-24 px-margin-mobile md:px-margin-desktop pb-12 transition-all">
+<!-- Header & Controls -->
+<div class="flex flex-col lg:flex-row lg:items-center justify-between mb-8 gap-4">
+<div>
+<h1 class="font-headline-lg text-headline-lg text-on-background">Dashboard</h1>
+<p class="font-body-lg text-body-sm text-on-surface-variant mt-1 flex items-center gap-2">
+<span class="inline-block w-2 h-2 rounded-full bg-success-vibrant animate-pulse" style="background-color: #10B981;"></span>
+                กำลังดึงข้อมูลจาก Windsor...
+            </p>
+</div>
+<div class="flex flex-wrap items-center gap-3">
+<!-- Account Switcher -->
+<div class="relative">
+<button class="flex items-center gap-2 px-4 py-2 bg-surface border border-border-subtle rounded text-on-surface font-medium hover:bg-surface-container-low transition-colors">
+<span class="material-symbols-outlined text-[20px]">account_circle</span>
+<span class="font-body-lg text-body-sm">ทุก Ad Account</span>
+<span class="material-symbols-outlined text-[16px]">expand_more</span>
+</button>
+</div>
+<!-- Date Range Selector -->
+<div class="flex bg-surface border border-border-subtle rounded p-1 overflow-hidden">
+<button class="px-3 py-1 text-[12px] font-semibold text-on-surface hover:bg-surface-container-low rounded transition-colors">7 วัน</button>
+<button class="px-3 py-1 text-[12px] font-semibold text-on-background bg-brand-yellow rounded transition-colors">14 วัน</button>
+<button class="px-3 py-1 text-[12px] font-semibold text-on-surface hover:bg-surface-container-low rounded transition-colors">30 วัน</button>
+<button class="hidden sm:block px-3 py-1 text-[12px] font-semibold text-on-surface hover:bg-surface-container-low rounded transition-colors">เดือนนี้</button>
+<button class="hidden sm:block px-3 py-1 text-[12px] font-semibold text-on-surface hover:bg-surface-container-low rounded transition-colors">เดือนที่แล้ว</button>
+</div>
+<button class="flex items-center gap-2 px-4 py-2 bg-brand-yellow text-on-background rounded font-bold hover:opacity-90 active:scale-95 transition-all">
+<span class="material-symbols-outlined text-[18px]">refresh</span>
+<span class="font-label-caps text-label-caps">รีเฟรช</span>
+</button>
+</div>
+</div>
+<!-- KPI Grid -->
+<section class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-5 gap-gutter mb-8">
+<!-- Spend -->
+<div class="bg-surface p-6 rounded border border-border-subtle shadow-sm flex flex-col justify-between hover:border-brand-yellow transition-colors group">
+<div>
+<div class="flex items-center justify-between mb-4">
+<span class="font-label-caps text-label-caps text-on-surface-variant">Total Spend</span>
+<span class="material-symbols-outlined text-brand-yellow">payments</span>
+</div>
+<p class="font-headline-lg text-title-md text-on-background">$42,920.00</p>
+</div>
+<div class="mt-4 flex items-center gap-2">
+<span class="text-success-vibrant flex items-center text-[12px] font-bold" style="color: #10B981;">
+<span class="material-symbols-outlined text-[16px]">trending_up</span> 12.5%
+                </span>
+<span class="text-outline text-[11px] font-medium uppercase tracking-wider">vs last 14d</span>
+</div>
+</div>
+<!-- CPM -->
+<div class="bg-surface p-6 rounded border border-border-subtle shadow-sm flex flex-col justify-between hover:border-brand-yellow transition-colors group">
+<div>
+<div class="flex items-center justify-between mb-4">
+<span class="font-label-caps text-label-caps text-on-surface-variant">CPM</span>
+<span class="material-symbols-outlined text-brand-yellow">visibility</span>
+</div>
+<p class="font-headline-lg text-title-md text-on-background">$18.42</p>
+</div>
+<div class="mt-4 flex items-center gap-2">
+<span class="text-error-vibrant flex items-center text-[12px] font-bold" style="color: #EF4444;">
+<span class="material-symbols-outlined text-[16px]">trending_up</span> 4.2%
+                </span>
+<span class="text-outline text-[11px] font-medium uppercase tracking-wider">vs last 14d</span>
+</div>
+</div>
+<!-- CPC -->
+<div class="bg-surface p-6 rounded border border-border-subtle shadow-sm flex flex-col justify-between hover:border-brand-yellow transition-colors group">
+<div>
+<div class="flex items-center justify-between mb-4">
+<span class="font-label-caps text-label-caps text-on-surface-variant">CPC</span>
+<span class="material-symbols-outlined text-brand-yellow" style="font-variation-settings: 'FILL' 1;">mouse</span>
+</div>
+<p class="font-headline-lg text-title-md text-on-background">$1.12</p>
+</div>
+<div class="mt-4 flex items-center gap-2">
+<span class="text-success-vibrant flex items-center text-[12px] font-bold" style="color: #10B981;">
+<span class="material-symbols-outlined text-[16px]">trending_down</span> 8.1%
+                </span>
+<span class="text-outline text-[11px] font-medium uppercase tracking-wider">vs last 14d</span>
+</div>
+</div>
+<!-- CTR -->
+<div class="bg-surface p-6 rounded border border-border-subtle shadow-sm flex flex-col justify-between hover:border-brand-yellow transition-colors group">
+<div>
+<div class="flex items-center justify-between mb-4">
+<span class="font-label-caps text-label-caps text-on-surface-variant">CTR</span>
+<span class="material-symbols-outlined text-brand-yellow">ads_click</span>
+</div>
+<p class="font-headline-lg text-title-md text-on-background">2.45%</p>
+</div>
+<div class="mt-4 flex items-center gap-2">
+<span class="text-success-vibrant flex items-center text-[12px] font-bold" style="color: #10B981;">
+<span class="material-symbols-outlined text-[16px]">trending_up</span> 0.8%
+                </span>
+<span class="text-outline text-[11px] font-medium uppercase tracking-wider">vs last 14d</span>
+</div>
+</div>
+<!-- Conversions -->
+<div class="bg-surface p-6 rounded border border-border-subtle shadow-sm flex flex-col justify-between hover:border-brand-yellow transition-colors group">
+<div>
+<div class="flex items-center justify-between mb-4">
+<span class="font-label-caps text-label-caps text-on-surface-variant">Conversions</span>
+<span class="material-symbols-outlined text-brand-yellow" style="font-variation-settings: 'FILL' 1;">shopping_cart</span>
+</div>
+<p class="font-headline-lg text-title-md text-on-background">1,204</p>
+</div>
+<div class="mt-4 flex items-center gap-2">
+<span class="text-success-vibrant flex items-center text-[12px] font-bold" style="color: #10B981;">
+<span class="material-symbols-outlined text-[16px]">trending_up</span> 21.4%
+                </span>
+<span class="text-outline text-[11px] font-medium uppercase tracking-wider">vs last 14d</span>
+</div>
+</div>
+</section>
+<!-- Main Performance Chart -->
+<section class="bg-surface rounded border border-border-subtle shadow-sm mb-8 overflow-hidden">
+<div class="px-6 py-4 border-b border-border-subtle flex items-center justify-between">
+<div>
+<h3 class="font-headline-lg text-title-md text-on-background">Performance Over Time</h3>
+<p class="font-body-lg text-body-sm text-on-surface-variant">Impressions and conversions trends</p>
+</div>
+<div class="flex items-center gap-4">
+<div class="flex items-center gap-2">
+<span class="w-3 h-3 rounded-full bg-brand-yellow"></span>
+<span class="font-label-caps text-label-caps text-on-surface-variant">Spend</span>
+</div>
+<div class="flex items-center gap-2">
+<span class="w-3 h-3 rounded-full bg-outline"></span>
+<span class="font-label-caps text-label-caps text-on-surface-variant">Conversions</span>
+</div>
+</div>
+</div>
+<div class="relative h-80 p-6 flex flex-col gap-4">
+<div class="flex-1 flex items-end gap-2 px-4 pt-10 relative">
+<!-- Grid Lines -->
+<div class="absolute inset-0 flex flex-col justify-between py-10 opacity-5">
+<div class="border-t border-on-background w-full"></div>
+<div class="border-t border-on-background w-full"></div>
+<div class="border-t border-on-background w-full"></div>
+<div class="border-t border-on-background w-full"></div>
+</div>
+<!-- Mock Area Chart -->
+<svg class="absolute bottom-0 left-0 w-full h-full" preserveaspectratio="none">
+<path d="M0,80 Q100,20 200,60 T400,40 T600,10 T800,50 T1000,30 L1000,100 L0,100 Z" fill="rgba(253, 210, 5, 0.1)"></path>
+<path d="M0,80 Q100,20 200,60 T400,40 T600,10 T800,50 T1000,30" fill="none" stroke="#fdd205" stroke-width="3"></path>
+</svg>
+<!-- Label Axis -->
+<div class="flex justify-between w-full absolute bottom-2 left-0 px-6 font-label-caps text-[10px] text-outline">
+<span>May 1</span><span>May 4</span><span>May 7</span><span>May 10</span><span>May 13</span><span>May 14</span>
+</div>
+<div class="absolute top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 flex flex-col items-center opacity-40">
+<span class="material-symbols-outlined text-[48px] text-outline">monitoring</span>
+<p class="font-body-lg text-body-sm text-outline">Real-time performance rendering...</p>
+</div>
+</div>
+</div>
+</section>
+<!-- Campaign Table -->
+<section class="bg-surface rounded border border-border-subtle shadow-sm overflow-hidden">
+<div class="px-6 py-4 border-b border-border-subtle flex items-center justify-between">
+<h3 class="font-headline-lg text-title-md text-on-background">Campaign Performance</h3>
+<div class="flex items-center gap-2">
+<div class="relative">
+<span class="material-symbols-outlined absolute left-3 top-1/2 -translate-y-1/2 text-[20px] text-outline">search</span>
+<input class="pl-10 pr-4 py-2 border border-border-subtle rounded text-body-sm bg-surface-container-low focus:ring-2 focus:ring-brand-yellow/20 focus:border-brand-yellow outline-none transition-all" placeholder="Search campaigns..." type="text"/>
+</div>
+<button class="p-2 border border-border-subtle rounded hover:bg-surface-container-low">
+<span class="material-symbols-outlined text-[20px]">filter_list</span>
+</button>
+</div>
+</div>
+<div class="overflow-x-auto custom-scrollbar">
+<table class="w-full text-left border-collapse">
+<thead>
+<tr class="bg-surface-container-low">
+<th class="px-6 py-4 font-label-caps text-label-caps text-on-surface-variant border-b border-border-subtle">
+<div class="flex items-center gap-1 cursor-pointer">Status <span class="material-symbols-outlined text-[16px]">unfold_more</span></div>
+</th>
+<th class="px-6 py-4 font-label-caps text-label-caps text-on-surface-variant border-b border-border-subtle">
+<div class="flex items-center gap-1 cursor-pointer">Campaign Name <span class="material-symbols-outlined text-[16px]">unfold_more</span></div>
+</th>
+<th class="px-6 py-4 font-label-caps text-label-caps text-on-surface-variant border-b border-border-subtle text-right">
+<div class="flex items-center justify-end gap-1 cursor-pointer">Spend <span class="material-symbols-outlined text-[16px]">unfold_more</span></div>
+</th>
+<th class="px-6 py-4 font-label-caps text-label-caps text-on-surface-variant border-b border-border-subtle text-right">
+<div class="flex items-center justify-end gap-1 cursor-pointer">Imp. <span class="material-symbols-outlined text-[16px]">unfold_more</span></div>
+</th>
+<th class="px-6 py-4 font-label-caps text-label-caps text-on-surface-variant border-b border-border-subtle text-right">
+<div class="flex items-center justify-end gap-1 cursor-pointer">CTR <span class="material-symbols-outlined text-[16px]">unfold_more</span></div>
+</th>
+<th class="px-6 py-4 font-label-caps text-label-caps text-on-surface-variant border-b border-border-subtle text-right">
+<div class="flex items-center justify-end gap-1 cursor-pointer">ROAS <span class="material-symbols-outlined text-[16px]">unfold_more</span></div>
+</th>
+</tr>
+</thead>
+<tbody class="divide-y divide-border-subtle">
+<tr class="hover:bg-surface-container-low transition-colors cursor-pointer group">
+<td class="px-6 py-4">
+<span class="px-2 py-1 bg-success-vibrant/10 text-success-vibrant rounded text-[10px] font-bold uppercase" style="color: #10B981; background-color: rgba(16, 185, 129, 0.1);">Active</span>
+</td>
+<td class="px-6 py-4 font-body-lg text-body-sm text-on-background font-semibold">Q2_Awareness_Video_Pro_01</td>
+<td class="px-6 py-4 font-label-caps text-body-sm text-on-surface-variant text-right">$8,241.50</td>
+<td class="px-6 py-4 font-label-caps text-body-sm text-on-surface-variant text-right">450,230</td>
+<td class="px-6 py-4 font-label-caps text-body-sm text-on-surface-variant text-right">2.14%</td>
+<td class="px-6 py-4 font-label-caps text-body-sm text-success-vibrant font-bold text-right" style="color: #10B981;">4.2x</td>
+</tr>
+<tr class="hover:bg-surface-container-low transition-colors cursor-pointer group">
+<td class="px-6 py-4">
+<span class="px-2 py-1 bg-success-vibrant/10 text-success-vibrant rounded text-[10px] font-bold uppercase" style="color: #10B981; background-color: rgba(16, 185, 129, 0.1);">Active</span>
+</td>
+<td class="px-6 py-4 font-body-lg text-body-sm text-on-background font-semibold">Retargeting_LAL_Purchasers_WW</td>
+<td class="px-6 py-4 font-label-caps text-body-sm text-on-surface-variant text-right">$12,400.00</td>
+<td class="px-6 py-4 font-label-caps text-body-sm text-on-surface-variant text-right">180,500</td>
+<td class="px-6 py-4 font-label-caps text-body-sm text-on-surface-variant text-right">3.82%</td>
+<td class="px-6 py-4 font-label-caps text-body-sm text-success-vibrant font-bold text-right" style="color: #10B981;">5.1x</td>
+</tr>
+<tr class="hover:bg-surface-container-low transition-colors cursor-pointer group">
+<td class="px-6 py-4">
+<span class="px-2 py-1 bg-warning-vibrant/10 text-warning-vibrant rounded text-[10px] font-bold uppercase" style="color: #F59E0B; background-color: rgba(245, 158, 11, 0.1);">Paused</span>
+</td>
+<td class="px-6 py-4 font-body-lg text-body-sm text-on-background font-semibold">Brand_Search_Exact_TH</td>
+<td class="px-6 py-4 font-label-caps text-body-sm text-on-surface-variant text-right">$4,120.20</td>
+<td class="px-6 py-4 font-label-caps text-body-sm text-on-surface-variant text-right">45,100</td>
+<td class="px-6 py-4 font-label-caps text-body-sm text-on-surface-variant text-right">12.5%</td>
+<td class="px-6 py-4 font-label-caps text-body-sm text-success-vibrant font-bold text-right" style="color: #10B981;">3.5x</td>
+</tr>
+<!-- Skeleton Loading Row -->
+<tr class="opacity-40">
+<td class="px-6 py-4"><div class="h-4 w-12 skeleton rounded"></div></td>
+<td class="px-6 py-4"><div class="h-4 w-48 skeleton rounded"></div></td>
+<td class="px-6 py-4"><div class="h-4 w-20 skeleton rounded ml-auto"></div></td>
+<td class="px-6 py-4"><div class="h-4 w-16 skeleton rounded ml-auto"></div></td>
+<td class="px-6 py-4"><div class="h-4 w-12 skeleton rounded ml-auto"></div></td>
+<td class="px-6 py-4"><div class="h-4 w-12 skeleton rounded ml-auto"></div></td>
+</tr>
+</tbody>
+</table>
+</div>
+<div class="px-6 py-4 bg-surface-container-low/50 border-t border-border-subtle flex justify-between items-center">
+<span class="font-body-lg text-body-sm text-on-surface-variant">Showing 3 of 12 campaigns</span>
+<div class="flex gap-2">
+<button class="px-3 py-1 border border-border-subtle rounded hover:bg-surface-container-low font-medium text-[12px] transition-colors">Previous</button>
+<button class="px-3 py-1 border border-border-subtle rounded hover:bg-surface-container-low font-medium text-[12px] transition-colors">Next</button>
+</div>
+</div>
+</section>
+</main>
+<!-- Interactive script for demo micro-interactions -->
+<script>
+    document.querySelectorAll('button, a').forEach(el => {
+        el.addEventListener('mousedown', () => {
+            el.style.transform = 'scale(0.97)';
+        });
+        el.addEventListener('mouseup', () => {
+            el.style.transform = '';
+        });
+        el.addEventListener('mouseleave', () => {
+            el.style.transform = '';
+        });
+    });
+
+    // Simulating the loading state message switch
+    const statusMsg = document.querySelector('p.flex.items-center.gap-2');
+    setTimeout(() => {
+        statusMsg.innerHTML = `
+            <span class="inline-block w-2 h-2 rounded-full bg-success-vibrant" style="background-color: #10B981;"></span>
+            Data up to date: Last refreshed 2 mins ago
+        `;
+        statusMsg.querySelector('span').classList.remove('animate-pulse');
+    }, 5000);
+</script>
+</body></html>

@@ -168,7 +168,14 @@
 /* ============================================================
    CONFIG — API key เก็บใน localStorage (ไม่ฝังในไฟล์)
    ============================================================ */
-const ENDPOINT = "https://connectors.windsor.ai/all";
+// เปิดผ่านเซิร์ฟเวอร์ (Railway) → ใช้ proxy /api/windsor (same-origin ไม่ติด CORS)
+// เปิดไฟล์ตรงๆ (file://) → ดึง Windsor ตรง ใช้ key จาก localStorage
+const USE_PROXY = location.protocol === "http:" || location.protocol === "https:";
+const ENDPOINT = USE_PROXY ? "/api/windsor" : "https://connectors.windsor.ai/all";
+function wfetch(params){
+  if(USE_PROXY) return fetch(`${ENDPOINT}?${params}`, {headers: API_KEY ? {"x-windsor-key":API_KEY} : {}});
+  return fetch(`${ENDPOINT}?api_key=${API_KEY}&${params}`);
+}
 const FIELDS = "source,account_name,account_id,campaign,campaign_status,objective,clicks,spend,impressions,reach,date";
 const PREV_FIELDS = "source,account_name,spend,impressions,reach,clicks";
 const KEY_STORE = "windsor_api_key";
@@ -212,7 +219,7 @@ async function loadAccounts(){
   }
   document.getElementById("landingContent").innerHTML='<div class="loading">กำลังโหลดรายชื่อ Account…</div>';
   try{
-    const res = await fetch(`${ENDPOINT}?api_key=${API_KEY}&date_preset=last_7d&fields=account_name,account_id,source,spend`);
+    const res = await wfetch(`date_preset=last_7d&fields=account_name,account_id,source,spend`);
     if(!res.ok) throw new Error("HTTP "+res.status);
     const rows=(await res.json()).data||[];
     const map={}; let grand=0;
@@ -275,7 +282,7 @@ async function load(){
   document.getElementById("content").innerHTML='<div class="loading">กำลังดึงข้อมูลจาก Windsor…</div>';
   const range = preset==="custom" ? `date_from=${customFrom}&date_to=${customTo}` : `date_preset=${preset}`;
   try{
-    const res=await fetch(`${ENDPOINT}?api_key=${API_KEY}&${range}&fields=${FIELDS}`);
+    const res=await wfetch(`${range}&fields=${FIELDS}`);
     if(!res.ok) throw new Error("HTTP "+res.status);
     rawData=((await res.json()).data||[]).map(r=>({
       source:norm(r.source), account:acctOf(r), id:r.account_id||"—",
@@ -292,7 +299,7 @@ async function load(){
     if(dates.length){
       const N=dates.length, to=addDays(dates[0],-1), from=addDays(dates[0],-N);
       try{
-        const pr=await fetch(`${ENDPOINT}?api_key=${API_KEY}&date_from=${from}&date_to=${to}&fields=${PREV_FIELDS}`);
+        const pr=await wfetch(`date_from=${from}&date_to=${to}&fields=${PREV_FIELDS}`);
         prevRaw=((await pr.json()).data||[]).map(r=>({source:norm(r.source),account:acctOf(r),spend:+r.spend||0,impressions:+r.impressions||0,reach:+r.reach||0,clicks:+r.clicks||0}));
       }catch(e){ prevRaw=[]; }
     }
