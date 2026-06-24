@@ -1,5 +1,6 @@
 # reference assets / local tooling
 _stitch_ref/
+_stitch_fb/
 .claude/
 *.zip
 node_modules/
