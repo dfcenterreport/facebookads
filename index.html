@@ -6,136 +6,157 @@
 <title>Windsor Media Dashboard</title>
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
-<link href="https://fonts.googleapis.com/css2?family=Hanken+Grotesk:wght@400;500;600;700&family=Noto+Sans+Thai:wght@400;500;600;700&display=swap" rel="stylesheet">
+<link href="https://fonts.googleapis.com/css2?family=Hanken+Grotesk:wght@500;600;700&family=Work+Sans:wght@400;500;600&family=JetBrains+Mono:wght@400;500;700&family=Noto+Sans+Thai:wght@400;500;600;700&display=swap" rel="stylesheet">
 <script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.1/dist/chart.umd.min.js"></script>
 <style>
   :root{
-    /* Windsor Light Analytics — Paper & Ink */
-    --bg-base:#f8fafc; --surface-card:#ffffff;
-    --surface-low:#f2f4f6; --surface-hover:#eceef0;
-    --border-subtle:#e2e8f0; --outline-variant:#c6c6ce;
-    --text-primary:#0f172a; --text-muted:#64748b;
-    --primary:#162139; --secondary:#3255c6; --secondary-soft:#6c8cff;
-    --success:#10b981; --error:#ef4444;
-    --fb:#4267B2; --tt:#25F4EE; --tw:#1DA1F2; --other:#94a3b8;
+    /* Luminous Precision — CI Yellow / Gray / White */
+    --yellow:#FDD205; --yellow-dim:#ebc300; --yellow-tint:#FFFBE6;
+    --ink:#1A1A1B; --gray:#969A9E; --border:#E2E4E6; --well:#F8F9F9;
+    --surface:#ffffff; --bg:#ffffff;
+    --text:#1A1A1B; --muted:#6b7178;
+    --good:#16a34a; --bad:#ba1a1a;
+    --fb:#4267B2; --tt:#0ea5b5; --tw:#1DA1F2; --other:#969A9E;
   }
   *{box-sizing:border-box;margin:0;padding:0}
-  body{
-    font-family:'Hanken Grotesk','Noto Sans Thai',system-ui,sans-serif;
-    background:var(--bg-base);color:var(--text-primary);
-    padding:24px;min-height:100vh;-webkit-font-smoothing:antialiased;
-  }
-  h1{font-size:24px;font-weight:700;letter-spacing:.3px;line-height:32px}
-  .sub{color:var(--text-muted);font-size:13px;margin-top:4px}
-  header{display:flex;justify-content:space-between;align-items:flex-start;flex-wrap:wrap;gap:16px;margin-bottom:24px}
-  .controls{display:flex;gap:10px;flex-wrap:wrap;align-items:center}
-  select{background:var(--surface-card);color:var(--text-primary);border:1px solid var(--border-subtle);border-radius:8px;padding:9px 12px;font:inherit;font-size:13px;cursor:pointer}
-  select:hover{background:var(--bg-base);border-color:var(--outline-variant)}
-  #accountFilter{max-width:240px}
-  button{background:var(--secondary);color:#fff;border:1px solid var(--secondary);border-radius:8px;padding:9px 16px;font:inherit;font-size:13px;font-weight:600;cursor:pointer}
-  button:hover{background:#2746a8}
-  button.btn-secondary{background:var(--surface-card);color:var(--text-primary);border:1px solid var(--border-subtle)}
-  button.btn-secondary:hover{background:var(--bg-base);border-color:var(--outline-variant)}
-  .chips{display:flex;gap:8px;flex-wrap:wrap;margin-bottom:20px}
-  .chip{padding:6px 14px;border-radius:9999px;border:1px solid var(--border-subtle);background:var(--surface-card);font-size:12px;font-weight:500;cursor:pointer;user-select:none;display:flex;align-items:center;gap:7px;transition:.15s}
-  .chip.off{opacity:.45;background:var(--surface-low)}
+  body{font-family:'Work Sans','Noto Sans Thai',system-ui,sans-serif;background:var(--bg);color:var(--text);padding:28px 32px;min-height:100vh;-webkit-font-smoothing:antialiased}
+  h1{font-family:'Hanken Grotesk','Noto Sans Thai',sans-serif;font-size:30px;font-weight:700;letter-spacing:-.01em;line-height:1.2}
+  h1 .accent{color:var(--yellow-dim)}
+  h3{font-family:'Hanken Grotesk','Noto Sans Thai',sans-serif;font-size:18px;font-weight:600}
+  .sub{color:var(--muted);font-size:14px;margin-top:4px}
+  .num{font-family:'JetBrains Mono',monospace}
+
+  header{display:flex;justify-content:space-between;align-items:flex-start;flex-wrap:wrap;gap:16px;margin-bottom:18px}
+  .controls{display:flex;gap:8px;flex-wrap:wrap;align-items:center}
+  select,input{font:inherit;font-size:13px;color:var(--text);background:var(--surface);border:1px solid var(--gray);border-radius:4px;padding:8px 11px}
+  select:focus,input:focus{outline:none;border:2px solid var(--yellow);padding:7px 10px}
+  #accountFilter{max-width:230px}
+
+  /* date pills */
+  .pills{display:flex;border:1px solid var(--border);border-radius:4px;overflow:hidden}
+  .pill{padding:8px 12px;font-size:13px;font-weight:500;cursor:pointer;background:var(--surface);color:var(--muted);border-right:1px solid var(--border)}
+  .pill:last-child{border-right:none}
+  .pill.active{background:var(--yellow);color:var(--ink);font-weight:600}
+
+  button{font:inherit;cursor:pointer;border-radius:4px;font-size:13px;font-weight:600;padding:9px 15px;border:1px solid var(--gray);background:var(--surface);color:var(--text)}
+  button:hover{background:var(--well)}
+  .btn-primary{background:var(--yellow);border:1px solid var(--yellow);color:var(--ink)}
+  .btn-primary:hover{background:var(--yellow-dim)}
+
+  .chips{display:flex;gap:8px;flex-wrap:wrap;margin-bottom:18px}
+  .chip{padding:5px 12px;border-radius:2px;border:1px solid var(--border);background:var(--surface);font-size:12px;font-weight:500;cursor:pointer;user-select:none;display:flex;align-items:center;gap:7px}
+  .chip.off{opacity:.4;background:var(--well)}
   .dot{width:9px;height:9px;border-radius:50%}
-  .kpis{display:grid;grid-template-columns:repeat(auto-fit,minmax(160px,1fr));gap:16px;margin-bottom:24px}
-  .kpi{background:var(--surface-card);border:1px solid var(--border-subtle);border-radius:12px;padding:18px}
-  .kpi .label{color:var(--text-muted);font-size:11px;font-weight:600;text-transform:uppercase;letter-spacing:.5px}
-  .kpi .val{font-size:28px;font-weight:700;line-height:34px;letter-spacing:-.5px;margin-top:8px}
-  .kpi .unit{font-size:14px;color:var(--text-muted);font-weight:400}
-  .grid{display:grid;grid-template-columns:2fr 1fr;gap:16px;margin-bottom:16px}
-  .grid.grid-2{grid-template-columns:1fr 1fr}
-  @media(max-width:900px){.grid,.grid.grid-2{grid-template-columns:1fr}}
-  .panel{background:var(--surface-card);border:1px solid var(--border-subtle);border-radius:12px;padding:20px}
-  .panel h3{font-size:14px;font-weight:600;line-height:20px;margin-bottom:16px}
-  table{width:100%;border-collapse:collapse;font-size:13px}
-  th,td{text-align:right;padding:10px 10px;border-bottom:1px solid var(--border-subtle)}
-  th:first-child,td:first-child{text-align:left}
-  th{color:var(--text-muted);font-weight:600;font-size:11px;text-transform:uppercase;letter-spacing:.5px;cursor:pointer;white-space:nowrap}
-  th:hover{color:var(--secondary)}
-  tbody tr:hover{background:var(--bg-base)}
-  td.camp{max-width:420px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
-  .src-tag{display:inline-block;padding:2px 9px;border-radius:9999px;font-size:11px;font-weight:600}
-  .loading,.error{text-align:center;padding:60px;color:var(--text-muted)}
-  .error{color:var(--error)}
+
+  /* KPI cards */
+  .kpis{display:grid;grid-template-columns:repeat(auto-fit,minmax(180px,1fr));gap:14px;margin-bottom:20px}
+  .kpi{background:var(--surface);border:1px solid var(--border);border-radius:8px;padding:16px}
+  .kpi.primary{border-left:4px solid var(--yellow)}
+  .kpi .klabel{font-family:'JetBrains Mono',monospace;font-size:11px;font-weight:500;letter-spacing:.05em;color:var(--muted);text-transform:uppercase}
+  .kpi .kval{font-family:'JetBrains Mono',monospace;font-size:25px;font-weight:700;letter-spacing:-.02em;margin-top:8px;color:var(--ink)}
+  .kpi .ktrend{margin-top:8px;font-size:12px;display:flex;align-items:center;gap:6px}
+  .trend{font-family:'JetBrains Mono',monospace;font-weight:500}
+  .trend.up{color:var(--good)} .trend.down{color:var(--bad)} .trend.flat{color:var(--gray)}
+  .ktrend .vs{color:var(--muted);font-size:11px}
+  .kpi.na .kval{color:var(--gray)}
+
+  .grid{display:grid;grid-template-columns:1fr;gap:16px;margin-bottom:16px}
+  .panel{background:var(--surface);border:1px solid var(--border);border-radius:8px;padding:20px}
+  .panel-head{display:flex;justify-content:space-between;align-items:center;margin-bottom:6px}
+  .panel .psub{color:var(--muted);font-size:13px;margin-bottom:14px}
   canvas{max-height:300px}
-  .footnote{color:var(--text-muted);font-size:11px;margin-top:10px}
-  /* Landing */
-  .landing-head{display:flex;justify-content:space-between;align-items:flex-start;gap:16px;margin-bottom:8px}
-  #landingView .sub{margin-bottom:24px}
-  .acct-grid{display:grid;grid-template-columns:repeat(auto-fill,minmax(240px,1fr));gap:14px}
-  .acct-card{background:var(--surface-card);color:var(--text-primary);border:1px solid var(--border-subtle);border-radius:12px;padding:18px;cursor:pointer;transition:.15s;text-align:left}
-  .acct-card:hover{border-color:var(--secondary);box-shadow:0 6px 18px rgba(15,23,42,.10);transform:translateY(-2px)}
-  .acct-card .name{font-size:15px;font-weight:700;line-height:1.35;color:var(--text-primary);margin-bottom:14px;display:-webkit-box;-webkit-line-clamp:2;-webkit-box-orient:vertical;overflow:hidden;min-height:40px}
-  .acct-card .meta{display:flex;justify-content:space-between;align-items:flex-end;gap:8px}
-  .acct-card .spend{font-size:20px;font-weight:700;letter-spacing:-.3px;color:var(--text-primary)}
-  .acct-card .srcs{display:flex;gap:4px;padding-bottom:4px}
-  .acct-card .sdot{width:9px;height:9px;border-radius:50%}
-  .acct-card .cap{font-size:10px;font-weight:600;color:var(--text-muted);text-transform:uppercase;letter-spacing:.5px;margin-bottom:3px}
-  /* การ์ด "ทุก Ad Account" — พื้นเข้ม ตัวอักษรขาว */
-  .acct-card.all{background:linear-gradient(135deg,#162139,#2c3650);border:none}
-  .acct-card.all,.acct-card.all .name,.acct-card.all .spend{color:#fff}
-  .acct-card.all .cap{color:#bcc6e6}
+
+  table{width:100%;border-collapse:collapse;font-size:13px}
+  th,td{text-align:right;padding:11px 10px;border-bottom:1px solid var(--border)}
+  th:first-child,td:first-child,th:nth-child(2),td:nth-child(2){text-align:left}
+  th{font-family:'JetBrains Mono',monospace;color:var(--muted);font-weight:500;font-size:11px;letter-spacing:.05em;text-transform:uppercase;cursor:pointer;white-space:nowrap}
+  th:hover{color:var(--ink)}
+  td{font-family:'JetBrains Mono',monospace}
+  td.camp{font-family:'Work Sans','Noto Sans Thai',sans-serif;max-width:380px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+  tbody tr:hover{background:var(--yellow-tint)}
+  .tag{display:inline-block;padding:2px 9px;border-radius:2px;font-family:'JetBrains Mono',monospace;font-size:10px;font-weight:500;letter-spacing:.04em}
+  .tag.active{background:#e7f6ec;color:#16a34a} .tag.paused{background:var(--well);color:var(--gray)}
+
+  .loading,.error{text-align:center;padding:60px;color:var(--muted)}
+  .error{color:var(--bad)}
+  .footnote{color:var(--muted);font-size:11px;margin-top:10px}
+
+  /* ===== Landing ===== */
+  .landing-head{display:flex;justify-content:space-between;align-items:flex-start;gap:16px;margin-bottom:6px}
+  #landingView .sub{margin-bottom:22px}
+  .land-bar{display:flex;gap:12px;align-items:center;background:var(--surface);border:1px solid var(--border);border-radius:8px;padding:14px 16px;margin-bottom:18px}
+  .land-bar .search{flex:1;display:flex;align-items:center;gap:8px;background:var(--surface);border:1px solid var(--gray);border-radius:4px;padding:0 10px}
+  .land-bar .search input{border:none;flex:1;padding:9px 0}
+  .land-bar .search input:focus{border:none;outline:none;padding:9px 0}
+  .acct-row{display:flex;align-items:center;gap:16px;background:var(--surface);border:1px solid var(--border);border-radius:8px;padding:16px 18px;margin-bottom:12px;transition:.12s}
+  .acct-row:hover{border-color:var(--gray);background:var(--well)}
+  .acct-row.all{border-left:4px solid var(--yellow)}
+  .acct-ico{width:46px;height:46px;flex:none;border-radius:6px;background:#fef6cf;display:flex;align-items:center;justify-content:center;font-size:20px}
+  .acct-info{flex:1;min-width:0}
+  .acct-name{font-family:'Hanken Grotesk','Noto Sans Thai',sans-serif;font-size:17px;font-weight:600;color:var(--ink);white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+  .acct-id{font-family:'JetBrains Mono',monospace;font-size:12px;color:var(--muted);margin-top:3px;display:flex;align-items:center;gap:8px}
+  .acct-id .sdots{display:flex;gap:3px}
+  .acct-id .sdot{width:8px;height:8px;border-radius:50%}
+  .acct-meta{text-align:right;flex:none;min-width:140px}
+  .acct-meta .spend{font-family:'JetBrains Mono',monospace;font-size:14px;font-weight:700;color:var(--ink)}
+  .acct-meta .cap{font-size:11px;color:var(--muted);margin-top:2px}
+  .land-note{display:flex;gap:10px;background:#fef6cf;border-radius:8px;padding:14px 16px;font-size:13px;color:#6f5b00;margin-top:18px}
 </style>
 </head>
 <body>
 
-<!-- ===================== LANDING / เลือก Account ===================== -->
+<!-- ===================== LANDING ===================== -->
 <section id="landingView">
   <div class="landing-head">
     <div>
-      <h1>📊 Windsor Media Dashboard</h1>
+      <h1>📊 Windsor Media <span class="accent">Dashboard</span></h1>
       <div class="sub">เลือก Ad Account ที่ต้องการดู เพื่อเข้าสู่หน้า dashboard</div>
     </div>
-    <button id="keyBtnLanding" class="btn-secondary">🔑 Key</button>
+    <button id="keyBtnLanding">🔑 Key</button>
   </div>
-  <div id="landingContent">
-    <div class="loading">กำลังโหลดรายชื่อ Account…</div>
+  <div class="land-bar">
+    <div class="search">🔍<input id="acctSearch" placeholder="ค้นหาชื่อ Account หรือ ID…"></div>
+    <button id="refreshLanding" class="btn-primary">↻ รีเฟรชข้อมูล</button>
   </div>
+  <div id="landingContent"><div class="loading">กำลังโหลดรายชื่อ Account…</div></div>
+  <div class="land-note">ℹ️ หากไม่พบ Account ที่ต้องการ กรุณาตรวจสอบสิทธิ์การเข้าถึงใน Business Manager / Windsor connector ของคุณ</div>
 </section>
 
 <!-- ===================== DASHBOARD ===================== -->
 <section id="dashboardView" style="display:none">
   <header>
     <div style="display:flex;align-items:center;gap:14px">
-      <button id="backBtn" class="btn-secondary">← เปลี่ยน Account</button>
+      <button id="backBtn">←</button>
       <div>
-        <h1 id="dashTitle">📊 Dashboard</h1>
+        <h1 id="dashTitle">Dashboard</h1>
         <div class="sub" id="rangeLabel">กำลังโหลด…</div>
       </div>
     </div>
     <div class="controls">
       <select id="accountFilter"><option value="__all__">ทุก Ad Account</option></select>
-      <select id="datePreset">
-        <option value="last_7d" selected>7 วันล่าสุด</option>
-        <option value="last_14d">14 วันล่าสุด</option>
-        <option value="last_30d">30 วันล่าสุด</option>
-        <option value="this_month">เดือนนี้</option>
-        <option value="last_month">เดือนที่แล้ว</option>
-      </select>
-      <button id="keyBtn" class="btn-secondary">🔑 Key</button>
-      <button id="refresh">🔄 รีเฟรช</button>
+      <div class="pills" id="datePills">
+        <div class="pill active" data-v="last_7d">7 วัน</div>
+        <div class="pill" data-v="last_14d">14 วัน</div>
+        <div class="pill" data-v="last_30d">30 วัน</div>
+        <div class="pill" data-v="this_month">เดือนนี้</div>
+        <div class="pill" data-v="last_month">เดือนก่อน</div>
+      </div>
+      <button id="keyBtn">🔑 Key</button>
+      <button id="refresh" class="btn-primary">↻ รีเฟรช</button>
     </div>
   </header>
 
   <div class="chips" id="srcChips"></div>
-
-  <div id="content">
-    <div class="loading">กำลังดึงข้อมูลจาก Windsor…</div>
-  </div>
+  <div id="content"><div class="loading">กำลังดึงข้อมูลจาก Windsor…</div></div>
 </section>
 
 <script>
 /* ============================================================
-   CONFIG
-   Windsor API key ไม่ได้ฝังในไฟล์ (กัน key รั่วบน repo public)
-   key เก็บใน localStorage ของเบราว์เซอร์ — กรอกครั้งแรกครั้งเดียว
-   กดปุ่ม "🔑 Key" เพื่อเปลี่ยน/ลบ key ได้ทุกเมื่อ
+   CONFIG — API key เก็บใน localStorage (ไม่ฝังในไฟล์)
    ============================================================ */
-const FIELDS  = "source,account_name,campaign,clicks,spend,impressions,reach,date";
 const ENDPOINT = "https://connectors.windsor.ai/all";
+const FIELDS = "source,account_name,account_id,campaign,campaign_status,objective,clicks,spend,impressions,reach,date";
+const PREV_FIELDS = "source,account_name,spend,impressions,reach,clicks";
 const KEY_STORE = "windsor_api_key";
 let API_KEY = localStorage.getItem(KEY_STORE) || "";
 
@@ -148,12 +169,11 @@ function ensureKey(force){
   return true;
 }
 
-const SRC_COLORS = {facebook:"#4267B2", tiktok:"#0ea5b5", twitter:"#1DA1F2", other:"#94a3b8"};
-const CHART_GRID = "#e2e8f0", CHART_TICK = "#64748b";
-let rawData = [];
-let wowRaw = [];
+const SRC_COLORS = {facebook:"#4267B2", tiktok:"#0ea5b5", twitter:"#1DA1F2", other:"#969A9E"};
+let rawData = [], prevRaw = [], landingAccts = [];
 let activeSources = new Set();
 let activeAccount = "__all__";
+let preset = "last_7d";
 let sortKey = "spend", sortDir = -1;
 let charts = [];
 
@@ -161,250 +181,212 @@ const fmtInt = n => Math.round(n).toLocaleString("en-US");
 const fmtMoney = n => "฿" + Math.round(n).toLocaleString("en-US");
 const fmtPct = n => (n*100).toFixed(2)+"%";
 const norm = s => (s && s.trim()) ? s : "other";
+const acctOf = r => r.account_name || "(ไม่ระบุบัญชี)";
+function addDays(ds,n){ const d=new Date(ds+"T00:00:00Z"); d.setUTCDate(d.getUTCDate()+n); return d.toISOString().slice(0,10); }
 
-/* ---------- LANDING: เลือก account ก่อนเข้า dashboard ---------- */
+/* ---------------- LANDING ---------------- */
 function showLanding(){
-  document.getElementById("dashboardView").style.display = "none";
-  document.getElementById("landingView").style.display = "block";
+  document.getElementById("dashboardView").style.display="none";
+  document.getElementById("landingView").style.display="block";
   charts.forEach(c=>c.destroy()); charts=[];
-  loadAccounts();
+  if(!landingAccts.length) loadAccounts();
 }
 
 async function loadAccounts(){
   if(!ensureKey(false)){
-    document.getElementById("landingContent").innerHTML =
-      '<div class="error">ยังไม่มี API key — กดปุ่ม “🔑 Key” เพื่อกรอก</div>';
-    return;
+    document.getElementById("landingContent").innerHTML='<div class="error">ยังไม่มี API key — กดปุ่ม “🔑 Key”</div>'; return;
   }
-  document.getElementById("landingContent").innerHTML =
-    '<div class="loading">กำลังโหลดรายชื่อ Account…</div>';
-  // ยิงแบบเบา: เฉพาะ account/source/spend ช่วงสั้น → เข้าเว็บไว
+  document.getElementById("landingContent").innerHTML='<div class="loading">กำลังโหลดรายชื่อ Account…</div>';
   try{
-    const res = await fetch(`${ENDPOINT}?api_key=${API_KEY}&date_preset=last_7d&fields=account_name,source,spend`);
+    const res = await fetch(`${ENDPOINT}?api_key=${API_KEY}&date_preset=last_7d&fields=account_name,account_id,source,spend`);
     if(!res.ok) throw new Error("HTTP "+res.status);
-    const rows = (await res.json()).data || [];
-    const map = {};
-    let grand = 0;
+    const rows=(await res.json()).data||[];
+    const map={}; let grand=0;
     rows.forEach(r=>{
-      const a = r.account_name || "(ไม่ระบุบัญชี)";
-      if(!map[a]) map[a] = {spend:0, srcs:new Set()};
-      map[a].spend += +r.spend||0;
+      const a=acctOf(r);
+      if(!map[a]) map[a]={name:a,id:r.account_id||"—",spend:0,srcs:new Set()};
+      map[a].spend+=+r.spend||0;
       if(r.source) map[a].srcs.add(norm(r.source));
-      grand += +r.spend||0;
+      grand+=+r.spend||0;
     });
-    const accts = Object.entries(map).map(([name,v])=>({name,spend:v.spend,srcs:[...v.srcs]}))
-                        .sort((a,b)=>b.spend-a.spend);
-    renderLanding(accts, grand);
+    landingAccts=Object.values(map).map(v=>({...v,srcs:[...v.srcs]})).sort((a,b)=>b.spend-a.spend);
+    renderLanding(grand);
   }catch(e){
-    document.getElementById("landingContent").innerHTML =
-      `<div class="error">❌ โหลดรายชื่อ Account ไม่สำเร็จ: ${e.message}</div>`;
+    document.getElementById("landingContent").innerHTML=`<div class="error">❌ โหลดรายชื่อ Account ไม่สำเร็จ: ${e.message}</div>`;
   }
 }
 
-function renderLanding(accts, grand){
-  const dots = srcs => srcs.map(s=>`<span class="sdot" style="background:${SRC_COLORS[s]||SRC_COLORS.other}" title="${s}"></span>`).join("");
-  const cards = accts.map(a=>`
-    <button class="acct-card" onclick="enterDashboard(${JSON.stringify(a.name).replace(/"/g,'&quot;')})">
-      <div class="name">${a.name}</div>
-      <div class="meta">
-        <div><div class="cap">Spend 7 วัน</div><div class="spend">${fmtMoney(a.spend)}</div></div>
-        <div class="srcs">${dots(a.srcs)}</div>
+function renderLanding(grand){
+  const q=(document.getElementById("acctSearch").value||"").toLowerCase();
+  const dots=srcs=>`<span class="sdots">${srcs.map(s=>`<span class="sdot" style="background:${SRC_COLORS[s]||SRC_COLORS.other}" title="${s}"></span>`).join("")}</span>`;
+  const list=landingAccts.filter(a=>!q||a.name.toLowerCase().includes(q)||String(a.id).toLowerCase().includes(q));
+  const rows=list.map(a=>`
+    <div class="acct-row">
+      <div class="acct-ico">📈</div>
+      <div class="acct-info">
+        <div class="acct-name">${a.name}</div>
+        <div class="acct-id">Account ID: ${a.id} ${dots(a.srcs)}</div>
       </div>
-    </button>`).join("");
-  document.getElementById("landingContent").innerHTML = `
-    <div class="acct-grid">
-      <button class="acct-card all" onclick="enterDashboard('__all__')">
-        <div class="name">📂 ทุก Ad Account</div>
-        <div class="meta">
-          <div><div class="cap">รวม Spend 7 วัน · ${accts.length} บัญชี</div><div class="spend">${fmtMoney(grand)}</div></div>
-        </div>
-      </button>
-      ${cards}
+      <div class="acct-meta"><div class="spend">${fmtMoney(a.spend)}</div><div class="cap">Spend 7 วัน</div></div>
+      <button class="btn-primary" onclick="enterDashboard(${JSON.stringify(a.name).replace(/"/g,'&quot;')})">เลือก ›</button>
+    </div>`).join("");
+  const allRow=`
+    <div class="acct-row all">
+      <div class="acct-ico">📂</div>
+      <div class="acct-info">
+        <div class="acct-name">ทุก Ad Account</div>
+        <div class="acct-id">รวมทุกบัญชี · ${landingAccts.length} accounts</div>
+      </div>
+      <div class="acct-meta"><div class="spend">${fmtMoney(grand)}</div><div class="cap">รวม Spend 7 วัน</div></div>
+      <button class="btn-primary" onclick="enterDashboard('__all__')">เลือก ›</button>
     </div>`;
+  document.getElementById("landingContent").innerHTML =
+    (q?"":allRow) + (rows || '<div class="loading">ไม่พบ Account ที่ค้นหา</div>');
 }
 
 function enterDashboard(account){
-  activeAccount = account;
-  activeSources = new Set();          // ให้ load() เติม source ใหม่ตามข้อมูล
-  document.getElementById("dashTitle").textContent =
-    account==="__all__" ? "📊 ทุก Ad Account" : "📊 " + account;
-  document.getElementById("landingView").style.display = "none";
-  document.getElementById("dashboardView").style.display = "block";
+  activeAccount=account;
+  activeSources=new Set();
+  document.getElementById("dashTitle").textContent = account==="__all__"?"ทุก Ad Account":account;
+  document.getElementById("landingView").style.display="none";
+  document.getElementById("dashboardView").style.display="block";
   load();
 }
 
+/* ---------------- DASHBOARD ---------------- */
 async function load(){
   if(!ensureKey(false)){
-    document.getElementById("content").innerHTML =
-      '<div class="error">ยังไม่มี API key — กดปุ่ม “🔑 Key” มุมขวาบนเพื่อกรอก</div>';
-    return;
+    document.getElementById("content").innerHTML='<div class="error">ยังไม่มี API key — กดปุ่ม “🔑 Key”</div>'; return;
   }
-  const preset = document.getElementById("datePreset").value;
-  document.getElementById("content").innerHTML = '<div class="loading">กำลังดึงข้อมูลจาก Windsor…</div>';
-  const url = `${ENDPOINT}?api_key=${API_KEY}&date_preset=${preset}&fields=${FIELDS}`;
+  document.getElementById("content").innerHTML='<div class="loading">กำลังดึงข้อมูลจาก Windsor…</div>';
   try{
-    const res = await fetch(url);
+    const res=await fetch(`${ENDPOINT}?api_key=${API_KEY}&date_preset=${preset}&fields=${FIELDS}`);
     if(!res.ok) throw new Error("HTTP "+res.status);
-    const json = await res.json();
-    rawData = (json.data||[]).map(r=>({
-      source: norm(r.source),
-      account: r.account_name || "(ไม่ระบุบัญชี)",
-      campaign: r.campaign || "(ไม่ระบุแคมเปญ)",
-      clicks: +r.clicks||0, spend:+r.spend||0,
+    rawData=((await res.json()).data||[]).map(r=>({
+      source:norm(r.source), account:acctOf(r), id:r.account_id||"—",
+      campaign:r.campaign||"(ไม่ระบุแคมเปญ)", status:(r.campaign_status||"").toUpperCase(),
+      objective:r.objective||"", clicks:+r.clicks||0, spend:+r.spend||0,
       impressions:+r.impressions||0, reach:+r.reach||0, date:r.date
     }));
-    const srcs = [...new Set(rawData.map(r=>r.source))];
+    const srcs=[...new Set(rawData.map(r=>r.source))];
     if(activeSources.size===0) srcs.forEach(s=>activeSources.add(s));
-    renderChips(srcs);
-    renderAccountFilter();
-    // ดึง 14 วันแยกต่างหาก สำหรับกราฟเปรียบเทียบรายสัปดาห์ (week-over-week)
-    try{
-      const wres = await fetch(`${ENDPOINT}?api_key=${API_KEY}&date_preset=last_14d&fields=source,account_name,spend,impressions,date`);
-      const wjson = await wres.json();
-      wowRaw = (wjson.data||[]).map(r=>({source:norm(r.source),account:r.account_name||"(ไม่ระบุบัญชี)",spend:+r.spend||0,impressions:+r.impressions||0,date:r.date}));
-    }catch(e){ wowRaw=[]; }
+    renderChips(srcs); renderAccountFilter();
+    // ดึงช่วงก่อนหน้า (เท่ากับจำนวนวันของช่วงปัจจุบัน) สำหรับคำนวณ trend
+    prevRaw=[];
+    const dates=[...new Set(rawData.map(r=>r.date))].sort();
+    if(dates.length){
+      const N=dates.length, to=addDays(dates[0],-1), from=addDays(dates[0],-N);
+      try{
+        const pr=await fetch(`${ENDPOINT}?api_key=${API_KEY}&date_from=${from}&date_to=${to}&fields=${PREV_FIELDS}`);
+        prevRaw=((await pr.json()).data||[]).map(r=>({source:norm(r.source),account:acctOf(r),spend:+r.spend||0,impressions:+r.impressions||0,reach:+r.reach||0,clicks:+r.clicks||0}));
+      }catch(e){ prevRaw=[]; }
+    }
     render();
   }catch(e){
-    document.getElementById("content").innerHTML =
-      `<div class="error">❌ ดึงข้อมูลไม่สำเร็จ: ${e.message}<br><span class="footnote">ตรวจสอบ API key / การเชื่อมต่ออินเทอร์เน็ต</span></div>`;
+    document.getElementById("content").innerHTML=`<div class="error">❌ ดึงข้อมูลไม่สำเร็จ: ${e.message}</div>`;
   }
 }
 
+function matchFilters(r){ return activeSources.has(r.source) && (activeAccount==="__all__"||r.account===activeAccount); }
+function sumOf(rows){ return rows.reduce((a,r)=>{a.spend+=r.spend;a.impr+=r.impressions;a.reach+=r.reach;a.clicks+=r.clicks;return a;},{spend:0,impr:0,reach:0,clicks:0}); }
+function deriv(s){ return {...s, cpm:s.impr?s.spend/s.impr*1000:0, cpc:s.clicks?s.spend/s.clicks:0, ctr:s.impr?s.clicks/s.impr:0, freq:s.reach?s.impr/s.reach:0}; }
+
+function trendHTML(cur,prev){
+  if(!prev || !isFinite(cur/prev)) return `<span class="trend flat">—</span><span class="vs">ไม่มีข้อมูลก่อนหน้า</span>`;
+  const pct=(cur-prev)/prev*100, up=pct>=0;
+  return `<span class="trend ${up?'up':'down'}">${up?'▲':'▼'} ${Math.abs(pct).toFixed(1)}%</span><span class="vs">vs ช่วงก่อน</span>`;
+}
+
 function renderChips(srcs){
-  const c = document.getElementById("srcChips");
-  c.innerHTML = "";
+  const c=document.getElementById("srcChips"); c.innerHTML="";
   srcs.forEach(s=>{
-    const on = activeSources.has(s);
-    const el = document.createElement("div");
-    el.className = "chip"+(on?"":" off");
-    el.innerHTML = `<span class="dot" style="background:${SRC_COLORS[s]||SRC_COLORS.other}"></span>${s}`;
-    el.onclick = ()=>{ on?activeSources.delete(s):activeSources.add(s); renderChips(srcs); render(); };
+    const on=activeSources.has(s);
+    const el=document.createElement("div");
+    el.className="chip"+(on?"":" off");
+    el.innerHTML=`<span class="dot" style="background:${SRC_COLORS[s]||SRC_COLORS.other}"></span>${s}`;
+    el.onclick=()=>{ on?activeSources.delete(s):activeSources.add(s); renderChips(srcs); render(); };
     c.appendChild(el);
   });
 }
 
 function renderAccountFilter(){
-  const sel = document.getElementById("accountFilter");
-  const accounts = [...new Set(rawData.map(r=>r.account))].sort((a,b)=>a.localeCompare(b));
-  // เก็บค่าที่เลือกไว้ถ้ายังมีในชุดข้อมูลใหม่
+  const sel=document.getElementById("accountFilter");
+  const accounts=[...new Set(rawData.map(r=>r.account))].sort((a,b)=>a.localeCompare(b));
   if(activeAccount!=="__all__" && !accounts.includes(activeAccount)) activeAccount="__all__";
-  sel.innerHTML = `<option value="__all__">ทุก Ad Account (${accounts.length})</option>` +
+  sel.innerHTML=`<option value="__all__">ทุก Ad Account (${accounts.length})</option>`+
     accounts.map(a=>`<option value="${a.replace(/"/g,'&quot;')}"${a===activeAccount?' selected':''}>${a}</option>`).join("");
-}
-
-function matchFilters(r){
-  return activeSources.has(r.source) && (activeAccount==="__all__" || r.account===activeAccount);
 }
 
 function render(){
   charts.forEach(c=>c.destroy()); charts=[];
-  const data = rawData.filter(matchFilters);
-  const dates = [...new Set(rawData.map(r=>r.date))].sort();
-  document.getElementById("rangeLabel").textContent =
-    dates.length ? `${dates[0]} → ${dates[dates.length-1]} · ${data.length} แถว` : "ไม่มีข้อมูล";
+  const data=rawData.filter(matchFilters);
+  const prev=prevRaw.filter(matchFilters);
+  const dates=[...new Set(rawData.map(r=>r.date))].sort();
+  document.getElementById("rangeLabel").textContent=
+    dates.length?`${dates[0]} → ${dates[dates.length-1]} · ${data.length} แถว · ข้อมูลจาก Windsor`:"ไม่มีข้อมูล";
 
-  const sum = data.reduce((a,r)=>{a.spend+=r.spend;a.impr+=r.impressions;a.reach+=r.reach;a.clicks+=r.clicks;return a;},
-                          {spend:0,impr:0,reach:0,clicks:0});
-  const cpm = sum.impr? sum.spend/sum.impr*1000 : 0;
-  const cpc = sum.clicks? sum.spend/sum.clicks : 0;
-  const ctr = sum.impr? sum.clicks/sum.impr : 0;
+  const c=deriv(sumOf(data)), p=deriv(sumOf(prev));
 
-  document.getElementById("content").innerHTML = `
-    <div class="kpis">
-      ${kpi("ค่าโฆษณา", fmtMoney(sum.spend))}
-      ${kpi("Impressions", fmtInt(sum.impr))}
-      ${kpi("Reach", fmtInt(sum.reach))}
-      ${kpi("Clicks", fmtInt(sum.clicks))}
-      ${kpi("CPM", fmtMoney(cpm))}
-      ${kpi("CPC", "฿"+cpc.toFixed(2))}
-      ${kpi("CTR", fmtPct(ctr))}
-    </div>
-    <div class="grid">
-      <div class="panel"><h3>แนวโน้มรายวัน — Spend &amp; Impressions</h3><canvas id="trend"></canvas></div>
-      <div class="panel"><h3>สัดส่วน Spend ตาม Source</h3><canvas id="pie"></canvas></div>
-    </div>
-    <div class="grid grid-2">
-      <div class="panel"><h3>เปรียบเทียบรายสัปดาห์ — Spend</h3><canvas id="wowSpend"></canvas></div>
-      <div class="panel"><h3>เปรียบเทียบรายสัปดาห์ — Impressions</h3><canvas id="wowImpr"></canvas></div>
-    </div>
-    <div class="panel">
-      <h3>Performance ตามแคมเปญ (Top 50)</h3>
-      <div style="overflow-x:auto">
-        <table id="tbl"><thead><tr>
-          ${th("campaign","แคมเปญ")}${th("source","Source")}${th("spend","Spend")}
-          ${th("impressions","Impr.")}${th("reach","Reach")}${th("clicks","Clicks")}
-          ${th("cpm","CPM")}${th("ctr","CTR")}
-        </tr></thead><tbody></tbody></table>
-      </div>
-      <div class="footnote">คลิกหัวคอลัมน์เพื่อจัดเรียง · conversions/revenue ไม่แสดง เพราะแคมเปญเป็นงาน Brand/Reach</div>
+  const kpi=(label,val,cur,prv,opt={})=>`
+    <div class="kpi ${opt.primary?'primary':''} ${opt.na?'na':''}">
+      <div class="klabel">${label}</div>
+      <div class="kval">${val}</div>
+      <div class="ktrend">${opt.na?'<span class="trend flat">—</span><span class="vs">ไม่มีข้อมูล conversion</span>':trendHTML(cur,prv)}</div>
     </div>`;
 
-  drawTrend(data, dates);
-  drawPie(data);
-  drawWoW();
+  document.getElementById("content").innerHTML=`
+    <div class="kpis">
+      ${kpi("Total Spend",fmtMoney(c.spend),c.spend,p.spend,{primary:true})}
+      ${kpi("Reach",fmtInt(c.reach),c.reach,p.reach)}
+      ${kpi("Impressions",fmtInt(c.impr),c.impr,p.impr)}
+      ${kpi("Clicks",fmtInt(c.clicks),c.clicks,p.clicks)}
+      ${kpi("CPM",fmtMoney(c.cpm),c.cpm,p.cpm)}
+      ${kpi("CPC","฿"+c.cpc.toFixed(2),c.cpc,p.cpc)}
+      ${kpi("CTR",fmtPct(c.ctr),c.ctr,p.ctr)}
+      ${kpi("Frequency",c.freq.toFixed(2),c.freq,p.freq)}
+      ${kpi("Conversions","—",0,0,{na:true})}
+    </div>
+    <div class="grid">
+      <div class="panel">
+        <div class="panel-head"><h3>Performance Over Time</h3></div>
+        <div class="psub">แนวโน้ม Spend และ Impressions รายวัน</div>
+        <canvas id="trend"></canvas>
+      </div>
+    </div>
+    <div class="panel">
+      <div class="panel-head"><h3>Campaign Performance</h3></div>
+      <div class="psub">เรียงตาม Spend · คลิกหัวคอลัมน์เพื่อจัดเรียง</div>
+      <div style="overflow-x:auto">
+        <table id="tbl"><thead><tr>
+          ${th("status","Status")}${th("campaign","Campaign Name")}${th("spend","Spend")}
+          ${th("impressions","Impr.")}${th("ctr","CTR")}${th("cpc","CPC")}
+        </tr></thead><tbody></tbody></table>
+      </div>
+      <div class="footnote">Conversions / ROAS ไม่แสดง เพราะ Windsor ส่งค่าเป็น 0/ว่าง (แคมเปญเป็นงาน Brand/Reach ไม่มี conversion tracking)</div>
+    </div>`;
+
+  drawTrend(data,dates);
   drawTable(data);
 }
 
-function drawWoW(){
-  const data = wowRaw.filter(r=>activeSources.has(r.source) && (activeAccount==="__all__" || r.account===activeAccount));
-  const dates = [...new Set(data.map(r=>r.date))].sort();
-  // แบ่งครึ่ง: ครึ่งหลัง = สัปดาห์ล่าสุด, ครึ่งแรก = สัปดาห์ก่อนหน้า
-  const half = Math.ceil(dates.length/2);
-  const latestSet = new Set(dates.slice(-half));
-  const prevSet = new Set(dates.slice(0, dates.length-half));
-  const sum = (set,key)=>data.reduce((a,r)=>a+(set.has(r.date)?r[key]:0),0);
-  const spendPrev=sum(prevSet,"spend"), spendLast=sum(latestSet,"spend");
-  const imprPrev=sum(prevSet,"impressions"), imprLast=sum(latestSet,"impressions");
+const th=(k,l)=>`<th onclick="sortBy('${k}')">${l}${sortKey===k?(sortDir<0?' ▾':' ▴'):''}</th>`;
 
-  charts.push(makeWoW("wowSpend",[spendPrev,spendLast],["#a5b1d6","#3255c6"],true));
-  charts.push(makeWoW("wowImpr",[imprPrev,imprLast],["#cbd5e1","#10b981"],false));
-}
-
-function makeWoW(id,vals,colors,isMoney){
-  return new Chart(document.getElementById(id),{
-    type:"bar",
-    data:{labels:["สัปดาห์ก่อนหน้า","สัปดาห์ล่าสุด"],
-      datasets:[{data:vals,backgroundColor:colors,borderRadius:4,maxBarThickness:80}]},
-    options:{responsive:true,
-      plugins:{legend:{display:false},
-        tooltip:{callbacks:{label:c=>(isMoney?"฿":"")+Math.round(c.parsed.y).toLocaleString("en-US")}}},
-      scales:{
-        x:{ticks:{color:CHART_TICK,font:{family:'Hanken Grotesk'}},grid:{display:false}},
-        y:{beginAtZero:true,ticks:{color:CHART_TICK,callback:v=>v.toLocaleString("en-US")},grid:{color:CHART_GRID}}
-      }}
-  });
-}
-
-const kpi = (l,v)=>`<div class="kpi"><div class="label">${l}</div><div class="val">${v}</div></div>`;
-const th  = (k,l)=>`<th data-k="${k}" onclick="sortBy('${k}')">${l}${sortKey===k?(sortDir<0?' ▾':' ▴'):''}</th>`;
-
-function drawTrend(data, dates){
-  const byDate = {};
-  dates.forEach(d=>byDate[d]={spend:0,impr:0});
-  data.forEach(r=>{ if(byDate[r.date]){byDate[r.date].spend+=r.spend; byDate[r.date].impr+=r.impressions;} });
+function drawTrend(data,dates){
+  const by={}; dates.forEach(d=>by[d]={spend:0,impr:0});
+  data.forEach(r=>{ if(by[r.date]){by[r.date].spend+=r.spend;by[r.date].impr+=r.impressions;} });
+  const grad = ctx=>{ const g=ctx.createLinearGradient(0,0,0,300); g.addColorStop(0,"rgba(253,210,5,.45)"); g.addColorStop(1,"rgba(253,210,5,0)"); return g; };
   charts.push(new Chart(document.getElementById("trend"),{
     data:{labels:dates,datasets:[
-      {type:"bar",label:"Spend (฿)",data:dates.map(d=>byDate[d].spend),backgroundColor:"#6c8cff",yAxisID:"y",borderRadius:4,maxBarThickness:34},
-      {type:"line",label:"Impressions",data:dates.map(d=>byDate[d].impr),borderColor:"#10b981",backgroundColor:"#10b981",yAxisID:"y1",tension:.3,pointRadius:3,borderWidth:2}
+      {type:"line",label:"Spend (฿)",data:dates.map(d=>by[d].spend),yAxisID:"y",borderColor:"#ebc300",backgroundColor:c=>grad(c.chart.ctx),fill:true,tension:.4,pointRadius:0,borderWidth:2.5},
+      {type:"line",label:"Impressions",data:dates.map(d=>by[d].impr),yAxisID:"y1",borderColor:"#969A9E",backgroundColor:"#969A9E",tension:.4,pointRadius:0,borderWidth:1.5,borderDash:[4,3]}
     ]},
     options:{responsive:true,interaction:{mode:"index",intersect:false},
-      plugins:{legend:{labels:{color:CHART_TICK,font:{family:'Hanken Grotesk'}}}},
+      plugins:{legend:{labels:{color:"#6b7178",font:{family:'Work Sans'},usePointStyle:true,boxWidth:8}}},
       scales:{
-        x:{ticks:{color:CHART_TICK},grid:{color:CHART_GRID}},
-        y:{position:"left",ticks:{color:"#3255c6"},grid:{color:CHART_GRID}},
-        y1:{position:"right",ticks:{color:"#10b981"},grid:{drawOnChartArea:false}}
+        x:{ticks:{color:"#969A9E",font:{family:'JetBrains Mono',size:10}},grid:{display:false}},
+        y:{position:"left",ticks:{color:"#ebc300",font:{family:'JetBrains Mono',size:10}},grid:{color:"#E2E4E6"}},
+        y1:{position:"right",ticks:{color:"#969A9E",font:{family:'JetBrains Mono',size:10}},grid:{drawOnChartArea:false}}
       }}
-  }));
-}
-
-function drawPie(data){
-  const by={}; data.forEach(r=>by[r.source]=(by[r.source]||0)+r.spend);
-  const labels=Object.keys(by);
-  charts.push(new Chart(document.getElementById("pie"),{
-    type:"doughnut",
-    data:{labels,datasets:[{data:labels.map(l=>by[l]),
-      backgroundColor:labels.map(l=>SRC_COLORS[l]||SRC_COLORS.other),borderColor:"#ffffff",borderWidth:3}]},
-    options:{plugins:{legend:{position:"bottom",labels:{color:CHART_TICK,padding:14,font:{family:'Hanken Grotesk'}}}}}
   }));
 }
 
@@ -412,47 +394,43 @@ function drawTable(data){
   const agg={};
   data.forEach(r=>{
     const k=r.campaign+"|"+r.source;
-    if(!agg[k]) agg[k]={campaign:r.campaign,source:r.source,spend:0,impressions:0,reach:0,clicks:0};
-    agg[k].spend+=r.spend; agg[k].impressions+=r.impressions; agg[k].reach+=r.reach; agg[k].clicks+=r.clicks;
+    if(!agg[k]) agg[k]={campaign:r.campaign,source:r.source,status:r.status,spend:0,impressions:0,clicks:0};
+    agg[k].spend+=r.spend; agg[k].impressions+=r.impressions; agg[k].clicks+=r.clicks;
+    if(r.status) agg[k].status=r.status;
   });
-  let rows=Object.values(agg).map(r=>({...r,
-    cpm:r.impressions?r.spend/r.impressions*1000:0,
-    ctr:r.impressions?r.clicks/r.impressions:0}));
-  rows.sort((a,b)=>{
-    let x=a[sortKey],y=b[sortKey];
-    if(typeof x==="string") return sortDir*x.localeCompare(y);
-    return sortDir*(x-y);
-  });
+  let rows=Object.values(agg).map(r=>({...r,ctr:r.impressions?r.clicks/r.impressions:0,cpc:r.clicks?r.spend/r.clicks:0}));
+  rows.sort((a,b)=>{ let x=a[sortKey],y=b[sortKey]; if(typeof x==="string") return sortDir*String(x).localeCompare(String(y)); return sortDir*(x-y); });
   rows=rows.slice(0,50);
-  const tb=document.querySelector("#tbl tbody");
-  tb.innerHTML=rows.map(r=>`<tr>
+  const tag=s=> s==="ACTIVE"?'<span class="tag active">ACTIVE</span>': s==="PAUSED"?'<span class="tag paused">PAUSED</span>': `<span class="tag paused">${s||'—'}</span>`;
+  document.querySelector("#tbl tbody").innerHTML=rows.map(r=>`<tr>
+    <td>${tag(r.status)}</td>
     <td class="camp" title="${r.campaign.replace(/"/g,'&quot;')}">${r.campaign}</td>
-    <td><span class="src-tag" style="background:${(SRC_COLORS[r.source]||SRC_COLORS.other)}1a;color:${SRC_COLORS[r.source]||SRC_COLORS.other}">${r.source}</span></td>
     <td>${fmtMoney(r.spend)}</td>
     <td>${fmtInt(r.impressions)}</td>
-    <td>${fmtInt(r.reach)}</td>
-    <td>${fmtInt(r.clicks)}</td>
-    <td>${fmtMoney(r.cpm)}</td>
     <td>${fmtPct(r.ctr)}</td>
+    <td>฿${r.cpc.toFixed(2)}</td>
   </tr>`).join("");
 }
 
-function sortBy(k){
-  if(sortKey===k) sortDir*=-1; else {sortKey=k; sortDir=-1;}
-  render();
-}
+function sortBy(k){ if(sortKey===k) sortDir*=-1; else {sortKey=k; sortDir=-1;} render(); }
 
-document.getElementById("refresh").onclick = load;
-document.getElementById("datePreset").onchange = load;
-document.getElementById("accountFilter").onchange = e=>{
-  activeAccount = e.target.value;
-  document.getElementById("dashTitle").textContent =
-    activeAccount==="__all__" ? "📊 ทุก Ad Account" : "📊 " + activeAccount;
+/* ---------------- events ---------------- */
+document.getElementById("refresh").onclick=load;
+document.getElementById("refreshLanding").onclick=()=>{ landingAccts=[]; loadAccounts(); };
+document.getElementById("acctSearch").oninput=()=>{ if(landingAccts.length){ const g=landingAccts.reduce((s,a)=>s+a.spend,0); renderLanding(g); } };
+document.getElementById("datePills").onclick=e=>{
+  const p=e.target.closest(".pill"); if(!p) return;
+  document.querySelectorAll("#datePills .pill").forEach(x=>x.classList.remove("active"));
+  p.classList.add("active"); preset=p.dataset.v; load();
+};
+document.getElementById("accountFilter").onchange=e=>{
+  activeAccount=e.target.value;
+  document.getElementById("dashTitle").textContent=activeAccount==="__all__"?"ทุก Ad Account":activeAccount;
   render();
 };
-document.getElementById("keyBtn").onclick = ()=>{ if(ensureKey(true)) load(); };
-document.getElementById("keyBtnLanding").onclick = ()=>{ if(ensureKey(true)) loadAccounts(); };
-document.getElementById("backBtn").onclick = showLanding;
+document.getElementById("keyBtn").onclick=()=>{ if(ensureKey(true)) load(); };
+document.getElementById("keyBtnLanding").onclick=()=>{ if(ensureKey(true)){ landingAccts=[]; loadAccounts(); } };
+document.getElementById("backBtn").onclick=showLanding;
 showLanding();
 </script>
 </body>
