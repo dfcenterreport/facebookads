@@ -37,6 +37,9 @@
   .pill{padding:8px 12px;font-size:13px;font-weight:500;cursor:pointer;background:var(--surface);color:var(--muted);border-right:1px solid var(--border)}
   .pill:last-child{border-right:none}
   .pill.active{background:var(--yellow);color:var(--ink);font-weight:600}
+  .range{display:flex;align-items:center;gap:5px}
+  .range input{padding:7px 8px;font-family:'JetBrains Mono',monospace;font-size:12px}
+  .range .rdash{color:var(--muted)}
 
   button{font:inherit;cursor:pointer;border-radius:4px;font-size:13px;font-weight:600;padding:9px 15px;border:1px solid var(--gray);background:var(--surface);color:var(--text)}
   button:hover{background:var(--well)}
@@ -76,6 +79,11 @@
   tbody tr:hover{background:var(--yellow-tint)}
   .tag{display:inline-block;padding:2px 9px;border-radius:2px;font-family:'JetBrains Mono',monospace;font-size:10px;font-weight:500;letter-spacing:.04em}
   .tag.active{background:#e7f6ec;color:#16a34a} .tag.paused{background:var(--well);color:var(--gray)}
+  .camp-row{cursor:pointer}
+  .car{display:inline-block;width:13px;color:var(--gray)}
+  tr.det td{background:var(--well);color:var(--muted);border-bottom:1px solid var(--border)}
+  tr.det:hover td{background:var(--well)}
+  td.day{padding-left:30px!important;color:var(--muted)}
 
   .loading,.error{text-align:center;padding:60px;color:var(--muted)}
   .error{color:var(--bad)}
@@ -141,6 +149,12 @@
         <div class="pill" data-v="this_month">เดือนนี้</div>
         <div class="pill" data-v="last_month">เดือนก่อน</div>
       </div>
+      <div class="range">
+        <input type="date" id="dFrom" title="วันเริ่มต้น">
+        <span class="rdash">–</span>
+        <input type="date" id="dTo" title="วันสิ้นสุด">
+        <button id="applyRange">ใช้</button>
+      </div>
       <button id="keyBtn">🔑 Key</button>
       <button id="refresh" class="btn-primary">↻ รีเฟรช</button>
     </div>
@@ -173,7 +187,7 @@ const SRC_COLORS = {facebook:"#4267B2", tiktok:"#0ea5b5", twitter:"#1DA1F2", oth
 let rawData = [], prevRaw = [], landingAccts = [];
 let activeSources = new Set();
 let activeAccount = "__all__";
-let preset = "last_7d";
+let preset = "last_7d", customFrom = "", customTo = "";
 let sortKey = "spend", sortDir = -1;
 let charts = [];
 
@@ -259,8 +273,9 @@ async function load(){
     document.getElementById("content").innerHTML='<div class="error">ยังไม่มี API key — กดปุ่ม “🔑 Key”</div>'; return;
   }
   document.getElementById("content").innerHTML='<div class="loading">กำลังดึงข้อมูลจาก Windsor…</div>';
+  const range = preset==="custom" ? `date_from=${customFrom}&date_to=${customTo}` : `date_preset=${preset}`;
   try{
-    const res=await fetch(`${ENDPOINT}?api_key=${API_KEY}&date_preset=${preset}&fields=${FIELDS}`);
+    const res=await fetch(`${ENDPOINT}?api_key=${API_KEY}&${range}&fields=${FIELDS}`);
     if(!res.ok) throw new Error("HTTP "+res.status);
     rawData=((await res.json()).data||[]).map(r=>({
       source:norm(r.source), account:acctOf(r), id:r.account_id||"—",
@@ -394,22 +409,39 @@ function drawTable(data){
   const agg={};
   data.forEach(r=>{
     const k=r.campaign+"|"+r.source;
-    if(!agg[k]) agg[k]={campaign:r.campaign,source:r.source,status:r.status,spend:0,impressions:0,clicks:0};
+    if(!agg[k]) agg[k]={campaign:r.campaign,source:r.source,status:r.status,spend:0,impressions:0,clicks:0,days:{}};
     agg[k].spend+=r.spend; agg[k].impressions+=r.impressions; agg[k].clicks+=r.clicks;
     if(r.status) agg[k].status=r.status;
+    const d=agg[k].days; if(!d[r.date]) d[r.date]={spend:0,impr:0,clicks:0};
+    d[r.date].spend+=r.spend; d[r.date].impr+=r.impressions; d[r.date].clicks+=r.clicks;
   });
   let rows=Object.values(agg).map(r=>({...r,ctr:r.impressions?r.clicks/r.impressions:0,cpc:r.clicks?r.spend/r.clicks:0}));
   rows.sort((a,b)=>{ let x=a[sortKey],y=b[sortKey]; if(typeof x==="string") return sortDir*String(x).localeCompare(String(y)); return sortDir*(x-y); });
   rows=rows.slice(0,50);
   const tag=s=> s==="ACTIVE"?'<span class="tag active">ACTIVE</span>': s==="PAUSED"?'<span class="tag paused">PAUSED</span>': `<span class="tag paused">${s||'—'}</span>`;
-  document.querySelector("#tbl tbody").innerHTML=rows.map(r=>`<tr>
-    <td>${tag(r.status)}</td>
-    <td class="camp" title="${r.campaign.replace(/"/g,'&quot;')}">${r.campaign}</td>
-    <td>${fmtMoney(r.spend)}</td>
-    <td>${fmtInt(r.impressions)}</td>
-    <td>${fmtPct(r.ctr)}</td>
-    <td>฿${r.cpc.toFixed(2)}</td>
-  </tr>`).join("");
+  let html="";
+  rows.forEach((r,i)=>{
+    html+=`<tr class="camp-row" onclick="toggleRow(${i})">
+      <td>${tag(r.status)}</td>
+      <td class="camp" title="${r.campaign.replace(/"/g,'&quot;')}"><span class="car" id="car-${i}">▸</span>${r.campaign}</td>
+      <td>${fmtMoney(r.spend)}</td>
+      <td>${fmtInt(r.impressions)}</td>
+      <td>${fmtPct(r.ctr)}</td>
+      <td>฿${r.cpc.toFixed(2)}</td>
+    </tr>`;
+    Object.entries(r.days).sort((a,b)=>a[0].localeCompare(b[0])).forEach(([dt,v])=>{
+      const ctr=v.impr?v.clicks/v.impr:0, cpc=v.clicks?v.spend/v.clicks:0;
+      html+=`<tr class="det det-${i}" style="display:none">
+        <td></td><td class="day">${dt}</td><td>${fmtMoney(v.spend)}</td>
+        <td>${fmtInt(v.impr)}</td><td>${fmtPct(ctr)}</td><td>฿${cpc.toFixed(2)}</td></tr>`;
+    });
+  });
+  document.querySelector("#tbl tbody").innerHTML=html;
+}
+
+function toggleRow(i){
+  document.querySelectorAll(".det-"+i).forEach(tr=>{ tr.style.display = tr.style.display==="none"?"table-row":"none"; });
+  const car=document.getElementById("car-"+i); if(car) car.textContent = car.textContent==="▸"?"▾":"▸";
 }
 
 function sortBy(k){ if(sortKey===k) sortDir*=-1; else {sortKey=k; sortDir=-1;} render(); }
@@ -421,7 +453,17 @@ document.getElementById("acctSearch").oninput=()=>{ if(landingAccts.length){ con
 document.getElementById("datePills").onclick=e=>{
   const p=e.target.closest(".pill"); if(!p) return;
   document.querySelectorAll("#datePills .pill").forEach(x=>x.classList.remove("active"));
-  p.classList.add("active"); preset=p.dataset.v; load();
+  p.classList.add("active"); preset=p.dataset.v;
+  document.getElementById("dFrom").value=""; document.getElementById("dTo").value="";
+  load();
+};
+document.getElementById("applyRange").onclick=()=>{
+  const f=document.getElementById("dFrom").value, t=document.getElementById("dTo").value;
+  if(!f||!t){ alert("กรุณาเลือกทั้งวันเริ่มต้นและวันสิ้นสุด"); return; }
+  if(f>t){ alert("วันเริ่มต้นต้องไม่เกินวันสิ้นสุด"); return; }
+  customFrom=f; customTo=t; preset="custom";
+  document.querySelectorAll("#datePills .pill").forEach(x=>x.classList.remove("active"));
+  load();
 };
 document.getElementById("accountFilter").onchange=e=>{
   activeAccount=e.target.value;
