@@ -62,33 +62,68 @@
   .error{color:var(--error)}
   canvas{max-height:300px}
   .footnote{color:var(--text-muted);font-size:11px;margin-top:10px}
+  /* Landing */
+  .landing-head{display:flex;justify-content:space-between;align-items:flex-start;gap:16px;margin-bottom:8px}
+  #landingView .sub{margin-bottom:24px}
+  .acct-grid{display:grid;grid-template-columns:repeat(auto-fill,minmax(240px,1fr));gap:14px}
+  .acct-card{background:var(--surface-card);border:1px solid var(--border-subtle);border-radius:12px;padding:16px;cursor:pointer;transition:.15s;text-align:left}
+  .acct-card:hover{border-color:var(--secondary);transform:translateY(-2px)}
+  .acct-card.all{background:linear-gradient(135deg,#162139,#2c3650);color:#fff;border:none}
+  .acct-card .name{font-size:14px;font-weight:600;line-height:1.35;margin-bottom:10px;display:-webkit-box;-webkit-line-clamp:2;-webkit-box-orient:vertical;overflow:hidden;min-height:38px}
+  .acct-card .meta{display:flex;justify-content:space-between;align-items:flex-end}
+  .acct-card .spend{font-size:18px;font-weight:700;letter-spacing:-.3px}
+  .acct-card .srcs{display:flex;gap:4px}
+  .acct-card .sdot{width:8px;height:8px;border-radius:50%}
+  .acct-card .cap{font-size:10px;color:var(--text-muted);text-transform:uppercase;letter-spacing:.5px}
+  .acct-card.all .cap{color:#bcc6e6}
 </style>
 </head>
 <body>
-<header>
-  <div>
-    <h1>📊 Windsor Media Dashboard</h1>
-    <div class="sub" id="rangeLabel">กำลังโหลด…</div>
-  </div>
-  <div class="controls">
-    <select id="accountFilter"><option value="__all__">ทุก Ad Account</option></select>
-    <select id="datePreset">
-      <option value="last_7d" selected>7 วันล่าสุด</option>
-      <option value="last_14d">14 วันล่าสุด</option>
-      <option value="last_30d">30 วันล่าสุด</option>
-      <option value="this_month">เดือนนี้</option>
-      <option value="last_month">เดือนที่แล้ว</option>
-    </select>
-    <button id="keyBtn" class="btn-secondary">🔑 Key</button>
-    <button id="refresh">🔄 รีเฟรช</button>
-  </div>
-</header>
 
-<div class="chips" id="srcChips"></div>
+<!-- ===================== LANDING / เลือก Account ===================== -->
+<section id="landingView">
+  <div class="landing-head">
+    <div>
+      <h1>📊 Windsor Media Dashboard</h1>
+      <div class="sub">เลือก Ad Account ที่ต้องการดู เพื่อเข้าสู่หน้า dashboard</div>
+    </div>
+    <button id="keyBtnLanding" class="btn-secondary">🔑 Key</button>
+  </div>
+  <div id="landingContent">
+    <div class="loading">กำลังโหลดรายชื่อ Account…</div>
+  </div>
+</section>
 
-<div id="content">
-  <div class="loading">กำลังดึงข้อมูลจาก Windsor…</div>
-</div>
+<!-- ===================== DASHBOARD ===================== -->
+<section id="dashboardView" style="display:none">
+  <header>
+    <div style="display:flex;align-items:center;gap:14px">
+      <button id="backBtn" class="btn-secondary">← เปลี่ยน Account</button>
+      <div>
+        <h1 id="dashTitle">📊 Dashboard</h1>
+        <div class="sub" id="rangeLabel">กำลังโหลด…</div>
+      </div>
+    </div>
+    <div class="controls">
+      <select id="accountFilter"><option value="__all__">ทุก Ad Account</option></select>
+      <select id="datePreset">
+        <option value="last_7d" selected>7 วันล่าสุด</option>
+        <option value="last_14d">14 วันล่าสุด</option>
+        <option value="last_30d">30 วันล่าสุด</option>
+        <option value="this_month">เดือนนี้</option>
+        <option value="last_month">เดือนที่แล้ว</option>
+      </select>
+      <button id="keyBtn" class="btn-secondary">🔑 Key</button>
+      <button id="refresh">🔄 รีเฟรช</button>
+    </div>
+  </header>
+
+  <div class="chips" id="srcChips"></div>
+
+  <div id="content">
+    <div class="loading">กำลังดึงข้อมูลจาก Windsor…</div>
+  </div>
+</section>
 
 <script>
 /* ============================================================
@@ -124,6 +159,77 @@ const fmtInt = n => Math.round(n).toLocaleString("en-US");
 const fmtMoney = n => "฿" + Math.round(n).toLocaleString("en-US");
 const fmtPct = n => (n*100).toFixed(2)+"%";
 const norm = s => (s && s.trim()) ? s : "other";
+
+/* ---------- LANDING: เลือก account ก่อนเข้า dashboard ---------- */
+function showLanding(){
+  document.getElementById("dashboardView").style.display = "none";
+  document.getElementById("landingView").style.display = "block";
+  charts.forEach(c=>c.destroy()); charts=[];
+  loadAccounts();
+}
+
+async function loadAccounts(){
+  if(!ensureKey(false)){
+    document.getElementById("landingContent").innerHTML =
+      '<div class="error">ยังไม่มี API key — กดปุ่ม “🔑 Key” เพื่อกรอก</div>';
+    return;
+  }
+  document.getElementById("landingContent").innerHTML =
+    '<div class="loading">กำลังโหลดรายชื่อ Account…</div>';
+  // ยิงแบบเบา: เฉพาะ account/source/spend ช่วงสั้น → เข้าเว็บไว
+  try{
+    const res = await fetch(`${ENDPOINT}?api_key=${API_KEY}&date_preset=last_7d&fields=account_name,source,spend`);
+    if(!res.ok) throw new Error("HTTP "+res.status);
+    const rows = (await res.json()).data || [];
+    const map = {};
+    let grand = 0;
+    rows.forEach(r=>{
+      const a = r.account_name || "(ไม่ระบุบัญชี)";
+      if(!map[a]) map[a] = {spend:0, srcs:new Set()};
+      map[a].spend += +r.spend||0;
+      if(r.source) map[a].srcs.add(norm(r.source));
+      grand += +r.spend||0;
+    });
+    const accts = Object.entries(map).map(([name,v])=>({name,spend:v.spend,srcs:[...v.srcs]}))
+                        .sort((a,b)=>b.spend-a.spend);
+    renderLanding(accts, grand);
+  }catch(e){
+    document.getElementById("landingContent").innerHTML =
+      `<div class="error">❌ โหลดรายชื่อ Account ไม่สำเร็จ: ${e.message}</div>`;
+  }
+}
+
+function renderLanding(accts, grand){
+  const dots = srcs => srcs.map(s=>`<span class="sdot" style="background:${SRC_COLORS[s]||SRC_COLORS.other}" title="${s}"></span>`).join("");
+  const cards = accts.map(a=>`
+    <button class="acct-card" onclick="enterDashboard(${JSON.stringify(a.name).replace(/"/g,'&quot;')})">
+      <div class="name">${a.name}</div>
+      <div class="meta">
+        <div><div class="cap">Spend 7 วัน</div><div class="spend">${fmtMoney(a.spend)}</div></div>
+        <div class="srcs">${dots(a.srcs)}</div>
+      </div>
+    </button>`).join("");
+  document.getElementById("landingContent").innerHTML = `
+    <div class="acct-grid">
+      <button class="acct-card all" onclick="enterDashboard('__all__')">
+        <div class="name">📂 ทุก Ad Account</div>
+        <div class="meta">
+          <div><div class="cap">รวม Spend 7 วัน · ${accts.length} บัญชี</div><div class="spend">${fmtMoney(grand)}</div></div>
+        </div>
+      </button>
+      ${cards}
+    </div>`;
+}
+
+function enterDashboard(account){
+  activeAccount = account;
+  activeSources = new Set();          // ให้ load() เติม source ใหม่ตามข้อมูล
+  document.getElementById("dashTitle").textContent =
+    account==="__all__" ? "📊 ทุก Ad Account" : "📊 " + account;
+  document.getElementById("landingView").style.display = "none";
+  document.getElementById("dashboardView").style.display = "block";
+  load();
+}
 
 async function load(){
   if(!ensureKey(false)){
@@ -336,9 +442,16 @@ function sortBy(k){
 
 document.getElementById("refresh").onclick = load;
 document.getElementById("datePreset").onchange = load;
-document.getElementById("accountFilter").onchange = e=>{ activeAccount = e.target.value; render(); };
+document.getElementById("accountFilter").onchange = e=>{
+  activeAccount = e.target.value;
+  document.getElementById("dashTitle").textContent =
+    activeAccount==="__all__" ? "📊 ทุก Ad Account" : "📊 " + activeAccount;
+  render();
+};
 document.getElementById("keyBtn").onclick = ()=>{ if(ensureKey(true)) load(); };
-load();
+document.getElementById("keyBtnLanding").onclick = ()=>{ if(ensureKey(true)) loadAccounts(); };
+document.getElementById("backBtn").onclick = showLanding;
+showLanding();
 </script>
 </body>
 </html>
