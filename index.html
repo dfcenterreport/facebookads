@@ -31,6 +31,7 @@
   .controls{display:flex;gap:10px;flex-wrap:wrap;align-items:center}
   select{background:var(--surface-card);color:var(--text-primary);border:1px solid var(--border-subtle);border-radius:8px;padding:9px 12px;font:inherit;font-size:13px;cursor:pointer}
   select:hover{background:var(--bg-base);border-color:var(--outline-variant)}
+  #accountFilter{max-width:240px}
   button{background:var(--secondary);color:#fff;border:1px solid var(--secondary);border-radius:8px;padding:9px 16px;font:inherit;font-size:13px;font-weight:600;cursor:pointer}
   button:hover{background:#2746a8}
   button.btn-secondary{background:var(--surface-card);color:var(--text-primary);border:1px solid var(--border-subtle)}
@@ -70,6 +71,7 @@
     <div class="sub" id="rangeLabel">กำลังโหลด…</div>
   </div>
   <div class="controls">
+    <select id="accountFilter"><option value="__all__">ทุก Ad Account</option></select>
     <select id="datePreset">
       <option value="last_7d" selected>7 วันล่าสุด</option>
       <option value="last_14d">14 วันล่าสุด</option>
@@ -95,7 +97,7 @@
    key เก็บใน localStorage ของเบราว์เซอร์ — กรอกครั้งแรกครั้งเดียว
    กดปุ่ม "🔑 Key" เพื่อเปลี่ยน/ลบ key ได้ทุกเมื่อ
    ============================================================ */
-const FIELDS  = "source,campaign,clicks,spend,impressions,reach,date";
+const FIELDS  = "source,account_name,campaign,clicks,spend,impressions,reach,date";
 const ENDPOINT = "https://connectors.windsor.ai/all";
 const KEY_STORE = "windsor_api_key";
 let API_KEY = localStorage.getItem(KEY_STORE) || "";
@@ -114,6 +116,7 @@ const CHART_GRID = "#e2e8f0", CHART_TICK = "#64748b";
 let rawData = [];
 let wowRaw = [];
 let activeSources = new Set();
+let activeAccount = "__all__";
 let sortKey = "spend", sortDir = -1;
 let charts = [];
 
@@ -137,6 +140,7 @@ async function load(){
     const json = await res.json();
     rawData = (json.data||[]).map(r=>({
       source: norm(r.source),
+      account: r.account_name || "(ไม่ระบุบัญชี)",
       campaign: r.campaign || "(ไม่ระบุแคมเปญ)",
       clicks: +r.clicks||0, spend:+r.spend||0,
       impressions:+r.impressions||0, reach:+r.reach||0, date:r.date
@@ -144,11 +148,12 @@ async function load(){
     const srcs = [...new Set(rawData.map(r=>r.source))];
     if(activeSources.size===0) srcs.forEach(s=>activeSources.add(s));
     renderChips(srcs);
+    renderAccountFilter();
     // ดึง 14 วันแยกต่างหาก สำหรับกราฟเปรียบเทียบรายสัปดาห์ (week-over-week)
     try{
-      const wres = await fetch(`${ENDPOINT}?api_key=${API_KEY}&date_preset=last_14d&fields=source,spend,impressions,date`);
+      const wres = await fetch(`${ENDPOINT}?api_key=${API_KEY}&date_preset=last_14d&fields=source,account_name,spend,impressions,date`);
       const wjson = await wres.json();
-      wowRaw = (wjson.data||[]).map(r=>({source:norm(r.source),spend:+r.spend||0,impressions:+r.impressions||0,date:r.date}));
+      wowRaw = (wjson.data||[]).map(r=>({source:norm(r.source),account:r.account_name||"(ไม่ระบุบัญชี)",spend:+r.spend||0,impressions:+r.impressions||0,date:r.date}));
     }catch(e){ wowRaw=[]; }
     render();
   }catch(e){
@@ -170,9 +175,22 @@ function renderChips(srcs){
   });
 }
 
+function renderAccountFilter(){
+  const sel = document.getElementById("accountFilter");
+  const accounts = [...new Set(rawData.map(r=>r.account))].sort((a,b)=>a.localeCompare(b));
+  // เก็บค่าที่เลือกไว้ถ้ายังมีในชุดข้อมูลใหม่
+  if(activeAccount!=="__all__" && !accounts.includes(activeAccount)) activeAccount="__all__";
+  sel.innerHTML = `<option value="__all__">ทุก Ad Account (${accounts.length})</option>` +
+    accounts.map(a=>`<option value="${a.replace(/"/g,'&quot;')}"${a===activeAccount?' selected':''}>${a}</option>`).join("");
+}
+
+function matchFilters(r){
+  return activeSources.has(r.source) && (activeAccount==="__all__" || r.account===activeAccount);
+}
+
 function render(){
   charts.forEach(c=>c.destroy()); charts=[];
-  const data = rawData.filter(r=>activeSources.has(r.source));
+  const data = rawData.filter(matchFilters);
   const dates = [...new Set(rawData.map(r=>r.date))].sort();
   document.getElementById("rangeLabel").textContent =
     dates.length ? `${dates[0]} → ${dates[dates.length-1]} · ${data.length} แถว` : "ไม่มีข้อมูล";
@@ -220,7 +238,7 @@ function render(){
 }
 
 function drawWoW(){
-  const data = wowRaw.filter(r=>activeSources.has(r.source));
+  const data = wowRaw.filter(r=>activeSources.has(r.source) && (activeAccount==="__all__" || r.account===activeAccount));
   const dates = [...new Set(data.map(r=>r.date))].sort();
   // แบ่งครึ่ง: ครึ่งหลัง = สัปดาห์ล่าสุด, ครึ่งแรก = สัปดาห์ก่อนหน้า
   const half = Math.ceil(dates.length/2);
@@ -318,6 +336,7 @@ function sortBy(k){
 
 document.getElementById("refresh").onclick = load;
 document.getElementById("datePreset").onchange = load;
+document.getElementById("accountFilter").onchange = e=>{ activeAccount = e.target.value; render(); };
 document.getElementById("keyBtn").onclick = ()=>{ if(ensureKey(true)) load(); };
 load();
 </script>
