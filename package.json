@@ -1,0 +1,14 @@
+{
+  "name": "windsor-dashboard",
+  "version": "1.0.0",
+  "description": "Windsor media dashboard (static site served via serve)",
+  "scripts": {
+    "start": "serve -s . -l ${PORT:-3000}"
+  },
+  "dependencies": {
+    "serve": "^14.2.4"
+  },
+  "engines": {
+    "node": ">=18"
+  }
+}

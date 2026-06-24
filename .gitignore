@@ -2,3 +2,4 @@
 _stitch_ref/
 .claude/
 *.zip
+node_modules/
