@@ -89,14 +89,13 @@
   .error{color:var(--bad)}
   .footnote{color:var(--muted);font-size:11px;margin-top:10px}
 
-  /* ===== Tabs ===== */
-  .tabs{display:flex;gap:4px;border-bottom:1px solid var(--border);margin-bottom:20px}
-  .tab{padding:10px 16px;font-size:14px;font-weight:600;color:var(--muted);cursor:pointer;border-bottom:2px solid transparent}
-  .tab:hover{color:var(--text)}
-  .tab.active{color:var(--ink);border-bottom-color:var(--yellow)}
-  .tabpage{display:none}
-  .tabpage.active{display:block}
-  .empty-page{text-align:center;padding:100px 20px;color:var(--muted)}
+  /* ===== Top nav ===== */
+  .topnav{display:flex;align-items:center;justify-content:space-between;padding-bottom:14px;margin-bottom:22px;border-bottom:1px solid var(--border)}
+  .topnav-brand{font-family:'Hanken Grotesk','Noto Sans Thai',sans-serif;font-weight:700;font-size:15px;color:var(--ink)}
+  .topnav-tabs{display:flex;gap:4px}
+  .topnav-tab{padding:8px 14px;font-size:13px;font-weight:600;color:var(--muted);cursor:pointer;border-radius:4px}
+  .topnav-tab:hover{color:var(--text);background:var(--well)}
+  .topnav-tab.active{background:var(--yellow);color:var(--ink)}
 
   /* ===== Landing ===== */
   .landing-head{display:flex;justify-content:space-between;align-items:flex-start;gap:16px;margin-bottom:6px}
@@ -122,7 +121,13 @@
 </head>
 <body>
 
-<p style="text-align:center;font-weight:700;padding:10px 0">hello Biddble</p>
+<nav class="topnav" id="topNav">
+  <div class="topnav-brand">📊 Windsor Media</div>
+  <div class="topnav-tabs">
+    <div class="topnav-tab active" data-view="app">Dashboard</div>
+    <div class="topnav-tab" data-view="biddable">Biddable</div>
+  </div>
+</nav>
 
 <!-- ===================== LANDING ===================== -->
 <section id="landingView">
@@ -171,17 +176,13 @@
     </div>
   </header>
 
-  <div class="tabs" id="dashTabs">
-    <div class="tab active" data-tab="overview">Overview</div>
-    <div class="tab" data-tab="biddable">Biddable</div>
-  </div>
+  <div class="chips" id="srcChips"></div>
+  <div id="content"><div class="loading">กำลังดึงข้อมูลจาก Windsor…</div></div>
+</section>
 
-  <div class="tabpage active" id="tabpage-overview">
-    <div class="chips" id="srcChips"></div>
-    <div id="content"><div class="loading">กำลังดึงข้อมูลจาก Windsor…</div></div>
-  </div>
-
-  <div class="tabpage" id="tabpage-biddable"></div>
+<!-- ===================== BIDDABLE (empty) ===================== -->
+<section id="biddableView" style="display:none">
+  <p style="text-align:center;font-weight:700;padding:10px 0">hello Biddble</p>
 </section>
 
 <script>
@@ -500,12 +501,22 @@ document.getElementById("accountFilter").onchange=e=>{
 document.getElementById("keyBtn").onclick=()=>{ if(ensureKey(true)) load(); };
 document.getElementById("keyBtnLanding").onclick=()=>{ if(ensureKey(true)){ landingAccts=[]; loadAccounts(); } };
 document.getElementById("backBtn").onclick=showLanding;
-document.getElementById("dashTabs").onclick=e=>{
-  const t=e.target.closest(".tab"); if(!t) return;
-  document.querySelectorAll("#dashTabs .tab").forEach(x=>x.classList.remove("active"));
-  document.querySelectorAll(".tabpage").forEach(x=>x.classList.remove("active"));
+
+let viewBeforeBiddable="landing";
+document.getElementById("topNav").onclick=e=>{
+  const t=e.target.closest(".topnav-tab"); if(!t) return;
+  document.querySelectorAll(".topnav-tab").forEach(x=>x.classList.remove("active"));
   t.classList.add("active");
-  document.getElementById("tabpage-"+t.dataset.tab).classList.add("active");
+  if(t.dataset.view==="biddable"){
+    viewBeforeBiddable = document.getElementById("dashboardView").style.display!=="none" ? "dashboard" : "landing";
+    document.getElementById("landingView").style.display="none";
+    document.getElementById("dashboardView").style.display="none";
+    document.getElementById("biddableView").style.display="block";
+  }else{
+    document.getElementById("biddableView").style.display="none";
+    if(viewBeforeBiddable==="dashboard") document.getElementById("dashboardView").style.display="block";
+    else showLanding();
+  }
 };
 showLanding();
 </script>
