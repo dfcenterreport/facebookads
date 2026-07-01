@@ -265,6 +265,7 @@
         <div class="pill" data-v="last_month">เดือนก่อน</div>
       </div>
       <button id="bidRefresh" class="btn-primary">↻ รีเฟรช</button>
+      <button id="bidDebug" title="ตรวจข้อมูล facebook_organic">🔧</button>
     </div>
   </div>
   <div id="bidContent"><div class="loading">กำลังดึงข้อมูลจาก Windsor…</div></div>
@@ -965,6 +966,21 @@ function drawBidTrend(data,dates){
 document.getElementById("bidCampaign").onchange=e=>{ bidCampaign=e.target.value; renderBiddable(); };
 document.getElementById("bidAccountFilter").onchange=e=>{ bidAccount=e.target.value; bidCampaign=""; renderBidCampaigns(); renderBiddable(); };
 document.getElementById("bidRefresh").onclick=()=>{ bidLoaded=false; loadBiddable(); };
+document.getElementById("bidDebug").onclick=async()=>{
+  const out=document.getElementById("bidContent");
+  out.insertAdjacentHTML("afterbegin",'<div id="dbg" class="panel" style="margin-bottom:16px">⏳ กำลังตรวจ facebook_organic…</div>');
+  const box=document.getElementById("dbg");
+  const tries=[["min (post_id,permalink_url,message)","post_id,permalink_url,message"],["date only","date"],["rich (tier0)",ORG_TIERS[0]]];
+  let html='<b>🔧 facebook_organic debug</b> <button onclick="this.closest(\'#dbg\').remove()" style="float:right">ปิด</button>';
+  for(const [name,f] of tries){
+    try{
+      const res=await wfetch(`date_preset=${bidPreset}&fields=${f}`,"facebook_organic");
+      const txt=await res.text();
+      html+=`<div style="margin-top:10px"><b>${name}</b> → HTTP ${res.status}<pre style="white-space:pre-wrap;font-size:11px;max-height:200px;overflow:auto;background:var(--well);padding:8px;border-radius:4px;margin-top:4px">${txt.slice(0,1500).replace(/&/g,"&amp;").replace(/</g,"&lt;")}</pre></div>`;
+    }catch(e){ html+=`<div style="margin-top:10px"><b>${name}</b> → ERROR ${e.message}</div>`; }
+  }
+  box.innerHTML=html;
+};
 document.getElementById("bidDatePills").onclick=e=>{
   const p=e.target.closest(".pill"); if(!p) return;
   document.querySelectorAll("#bidDatePills .pill").forEach(x=>x.classList.remove("active"));
