@@ -248,7 +248,12 @@
 <!-- ===================== ACTIVE AD ACCOUNT ===================== -->
 <section id="activeacctView" style="display:none">
   <h1 style="margin-bottom:6px">Active Ad account</h1>
-  <div class="sub" style="margin-bottom:22px">สถานะบัญชีโฆษณาทั้งหมด (Active / Inactive)</div>
+  <div class="sub" style="margin-bottom:18px">สถานะบัญชีโฆษณาทั้งหมด (Active / Inactive)</div>
+  <div class="pills" id="acctStatusFilter" style="width:fit-content;margin-bottom:18px">
+    <div class="pill active" data-v="all">ทั้งหมด</div>
+    <div class="pill" data-v="active">🟢 Active</div>
+    <div class="pill" data-v="inactive">⚪ Inactive</div>
+  </div>
   <div id="activeAcctContent"><div class="loading">กำลังดึงข้อมูลจาก Windsor…</div></div>
 </section>
 
@@ -484,6 +489,7 @@ function render(){
 
 /* ---------------- ACTIVE AD ACCOUNT ---------------- */
 let activeAcctData = [];
+let activeAcctFilter = "all";
 async function loadActiveAccounts(){
   if(!ensureKey(false)){
     document.getElementById("activeAcctContent").innerHTML='<div class="error">ยังไม่มี API key — กดปุ่ม “🔑 Key”</div>'; return;
@@ -508,7 +514,9 @@ async function loadActiveAccounts(){
 }
 
 function renderActiveAccounts(){
-  const rows=activeAcctData.map(a=>`
+  const list=activeAcctData.filter(a=>
+    activeAcctFilter==="all" || (activeAcctFilter==="active"?a.active:!a.active));
+  const rows=list.map(a=>`
     <div class="acct-row">
       <div class="acct-ico">${a.active?'🟢':'⚪'}</div>
       <div class="acct-info">
@@ -517,7 +525,7 @@ function renderActiveAccounts(){
       </div>
       <div class="acct-meta"><div class="spend">${fmtMoney(a.spend)}</div><div class="cap">Spend 7 วัน</div></div>
     </div>`).join("");
-  document.getElementById("activeAcctContent").innerHTML = rows || '<div class="loading">ไม่มีข้อมูล Ad Account</div>';
+  document.getElementById("activeAcctContent").innerHTML = rows || '<div class="loading">ไม่พบ Ad Account ตามตัวกรองนี้</div>';
 }
 
 const th=(k,l)=>`<th onclick="sortBy('${k}')">${l}${sortKey===k?(sortDir<0?' ▾':' ▴'):''}</th>`;
@@ -797,6 +805,12 @@ document.getElementById("bidDatePills").onclick=e=>{
 };
 document.getElementById("refresh").onclick=load;
 document.getElementById("refreshLanding").onclick=()=>{ landingAccts=[]; loadAccounts(); };
+document.getElementById("acctStatusFilter").onclick=e=>{
+  const p=e.target.closest(".pill"); if(!p) return;
+  document.querySelectorAll("#acctStatusFilter .pill").forEach(x=>x.classList.remove("active"));
+  p.classList.add("active"); activeAcctFilter=p.dataset.v;
+  renderActiveAccounts();
+};
 document.getElementById("acctSearch").oninput=()=>{ if(landingAccts.length){ const g=landingAccts.reduce((s,a)=>s+a.spend,0); renderLanding(g); } };
 document.getElementById("datePills").onclick=e=>{
   const p=e.target.closest(".pill"); if(!p) return;
