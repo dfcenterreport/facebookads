@@ -303,6 +303,11 @@
       <button id="acctApplyRange">ใช้</button>
     </div>
   </div>
+  <div class="panel" style="margin-bottom:20px">
+    <div class="panel-head"><h3>Monthly Spend Trend (2024–2026)</h3></div>
+    <div class="psub">ยอด Spend รวมรายเดือนของทุก Ad Account</div>
+    <canvas id="acctMonthlyTrend"></canvas>
+  </div>
   <div id="activeAcctContent"><div class="loading">กำลังดึงข้อมูลจาก Windsor…</div></div>
 </section>
 
@@ -595,6 +600,43 @@ function renderActiveAccounts(){
       <div class="acct-meta"><div class="spend">${fmtMoney(a.spend)}</div><div class="cap">Spend ${periodLabel}</div></div>
     </div>`).join("");
   document.getElementById("activeAcctContent").innerHTML = rows || '<div class="loading">ไม่พบ Ad Account ตามตัวกรองนี้</div>';
+}
+
+let acctMonthlyChart = null, acctMonthlyLoaded = false;
+async function loadMonthlyTrend(){
+  if(!ensureKey(false)) return;
+  acctMonthlyLoaded = true;
+  try{
+    const res = await wfetch(`date_from=2024-01-01&date_to=2026-12-31&fields=spend,date`);
+    if(!res.ok) throw new Error("HTTP "+res.status);
+    const rows=(await res.json()).data||[];
+    const byMonth={};
+    rows.forEach(r=>{
+      if(!r.date) return;
+      const m=r.date.slice(0,7);
+      byMonth[m]=(byMonth[m]||0)+(+r.spend||0);
+    });
+    const months=[];
+    for(let y=2024;y<=2026;y++) for(let mo=1;mo<=12;mo++) months.push(`${y}-${String(mo).padStart(2,"0")}`);
+    drawMonthlyTrend(months, months.map(m=>byMonth[m]||0));
+  }catch(e){
+    acctMonthlyLoaded = false;
+  }
+}
+
+function drawMonthlyTrend(labels, values){
+  if(acctMonthlyChart) acctMonthlyChart.destroy();
+  const grad = ctx=>{ const g=ctx.createLinearGradient(0,0,0,300); g.addColorStop(0,"rgba(253,210,5,.45)"); g.addColorStop(1,"rgba(253,210,5,0)"); return g; };
+  acctMonthlyChart = new Chart(document.getElementById("acctMonthlyTrend"),{
+    type:"line",
+    data:{labels, datasets:[{label:"Spend (฿)", data:values, borderColor:"#ebc300", backgroundColor:c=>grad(c.chart.ctx), fill:true, tension:.3, pointRadius:0, borderWidth:2.5}]},
+    options:{responsive:true, interaction:{mode:"index",intersect:false},
+      plugins:{legend:{labels:{color:"#6b7178",font:{family:'Work Sans'},usePointStyle:true,boxWidth:8}}},
+      scales:{
+        x:{ticks:{color:"#969A9E",font:{family:'JetBrains Mono',size:10}},grid:{display:false}},
+        y:{ticks:{color:"#969A9E",font:{family:'JetBrains Mono',size:10}},grid:{color:"#E2E4E6"}}
+      }}
+  });
 }
 
 const th=(k,l)=>`<th onclick="sortBy('${k}')">${l}${sortKey===k?(sortDir<0?' ▾':' ▴'):''}</th>`;
@@ -1078,6 +1120,7 @@ document.getElementById("topNav").onclick=e=>{
     document.getElementById("dashboardView").style.display="none";
     SIDE_VIEWS.forEach(v=>document.getElementById(v+"View").style.display = v===view?"block":"none");
     if(view==="activeacct" && !activeAcctData.length) loadActiveAccounts();
+    if(view==="activeacct" && !acctMonthlyLoaded) loadMonthlyTrend();
     if(view==="biddable" && !bidLoaded) loadBiddable();
   }else{
     SIDE_VIEWS.forEach(v=>document.getElementById(v+"View").style.display="none");
