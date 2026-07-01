@@ -130,6 +130,19 @@
   .brk-metrics .mk{color:var(--muted)}
   .brk-metrics .mv{color:var(--ink);text-align:right;font-weight:600}
 
+  /* ===== Biddable — creative cards ===== */
+  #bidCampaign{max-width:360px}
+  .cre-grid{display:grid;grid-template-columns:repeat(auto-fill,minmax(210px,1fr));gap:12px;margin-top:4px}
+  .cre-card{border:1px solid var(--border);border-radius:8px;overflow:hidden;cursor:pointer;background:var(--surface);transition:.12s}
+  .cre-card:hover{border-color:var(--gray)}
+  .cre-card.sel{border:2px solid var(--yellow);box-shadow:0 0 0 3px var(--yellow-tint)}
+  .cre-thumb{width:100%;aspect-ratio:1/1;object-fit:cover;background:var(--well);display:block}
+  .cre-thumb.ph{display:flex;align-items:center;justify-content:center;color:var(--gray);font-size:26px}
+  .cre-body{padding:10px 12px}
+  .cre-name{font-size:13px;font-weight:600;color:var(--ink);line-height:1.35;max-height:2.7em;overflow:hidden}
+  .cre-adset{font-size:11px;color:var(--muted);margin:2px 0 4px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+  .cre-detail{margin-top:16px;border:1px solid var(--border);border-radius:8px;padding:16px;background:var(--well)}
+
   /* ===== Landing ===== */
   .landing-head{display:flex;justify-content:space-between;align-items:flex-start;gap:16px;margin-bottom:6px}
   #landingView .sub{margin-bottom:22px}
@@ -218,11 +231,12 @@
 <section id="biddableView" style="display:none">
   <div class="bid-head">
     <div>
-      <h1>💸 Biddable <span class="accent">Cost Monitor</span></h1>
-      <div class="sub" id="bidRangeLabel">ติดตาม cost per metric รายวัน (CPM · CPC · CPV · CPE · CPL)</div>
+      <h1>💸 Biddable <span class="accent">Creative Monitor</span></h1>
+      <div class="sub" id="bidRangeLabel">เลือกบัญชี + แคมเปญ เพื่อดูต้นทุนและ creative แต่ละตัว</div>
     </div>
     <div class="controls">
       <select id="bidAccountFilter"><option value="__all__">ทุก Ad Account</option></select>
+      <select id="bidCampaign"><option value="">— ทุกแคมเปญ —</option></select>
       <div class="pills" id="bidDatePills">
         <div class="pill" data-v="last_7d">7 วัน</div>
         <div class="pill" data-v="last_14d">14 วัน</div>
@@ -234,15 +248,6 @@
     </div>
   </div>
   <div id="bidContent"><div class="loading">กำลังดึงข้อมูลจาก Windsor…</div></div>
-
-  <div class="brk-panel">
-    <div class="brk-top">
-      <h3>🧩 Campaign Breakdown <span style="font-weight:400;color:var(--muted);font-size:13px">adset · ads · creative</span></h3>
-      <select id="bidCampaign"><option value="">— เลือกแคมเปญ —</option></select>
-    </div>
-    <div class="brk-sub" id="brkSub">เลือกแคมเปญเพื่อดู breakdown ตาม adset และ ads พร้อม creative</div>
-    <div id="bidTree"></div>
-  </div>
 </section>
 
 <!-- ===================== ACTIVE AD ACCOUNT ===================== -->
@@ -294,9 +299,8 @@ function wfetch(params){
 }
 const FIELDS = "source,account_name,account_id,campaign,campaign_status,objective,clicks,spend,impressions,reach,date";
 const PREV_FIELDS = "source,account_name,spend,impressions,reach,clicks";
-const BID_FIELDS = "source,account_name,account_id,spend,impressions,clicks,link_clicks,video_views,post_engagement,leads,date";
-const BRK_FIELDS = "source,account_name,campaign,adset_name,ad_name,thumbnail_url,spend,impressions,reach,clicks,date";
-const BRK_FIELDS_NOIMG = "source,account_name,campaign,adset_name,ad_name,spend,impressions,reach,clicks,date";
+const BID_FIELDS = "source,account_name,account_id,campaign,adset_name,ad_name,thumbnail_url,spend,impressions,reach,clicks,date";
+const BID_FIELDS_NOIMG = "source,account_name,account_id,campaign,adset_name,ad_name,spend,impressions,reach,clicks,date";
 const KEY_STORE = "windsor_api_key";
 let API_KEY = localStorage.getItem(KEY_STORE) || "";
 
@@ -620,16 +624,10 @@ function toggleRow(i){
 
 function sortBy(k){ if(sortKey===k) sortDir*=-1; else {sortKey=k; sortDir=-1;} render(); }
 
-/* ---------------- BIDDABLE (cost monitor) ---------------- */
-// นิยาม cost-per metric: numerator=spend เสมอ, denom=ตัวหารของแต่ละ metric
-const BID_METRICS = [
-  {key:"cpm", label:"CPM", sub:"ต้นทุนต่อ 1,000 impressions", denom:"impressions", mult:1000, unit:"฿"},
-  {key:"cpc", label:"CPC", sub:"ต้นทุนต่อคลิก (link click)",   denom:"link_clicks", mult:1, unit:"฿", fallback:"clicks"},
-  {key:"cpv", label:"CPV", sub:"ต้นทุนต่อการดูวิดีโอ",         denom:"video_views", mult:1, unit:"฿"},
-  {key:"cpe", label:"CPE", sub:"ต้นทุนต่อ engagement",          denom:"post_engagement", mult:1, unit:"฿"},
-  {key:"cpl", label:"CPL", sub:"ต้นทุนต่อ lead",                denom:"leads", mult:1, unit:"฿"},
-];
-let bidRaw=[], bidAccount="__all__", bidPreset="last_30d", bidCharts=[], bidLoaded=false;
+/* ---------------- BIDDABLE — creative monitor (เจาะบัญชี + แคมเปญ) ---------------- */
+let bidRaw=[], bidAccount="__all__", bidCampaign="", bidPreset="last_30d", bidLoaded=false, bidChart=null, bidNoImg=false, bidAuto=true;
+let bidCreatives=[], bidSel=-1;
+const fmtK = n => n>=1000 ? (n/1000).toFixed(n>=10000?0:1)+"K" : fmtInt(n);
 
 function showBiddable(){
   document.getElementById("landingView").style.display="none";
@@ -644,18 +642,24 @@ async function loadBiddable(){
   }
   document.getElementById("bidContent").innerHTML='<div class="loading">กำลังดึงข้อมูลจาก Windsor…</div>';
   try{
-    const res=await wfetch(`date_preset=${bidPreset}&fields=${BID_FIELDS}`);
-    if(!res.ok) throw new Error("HTTP "+res.status);
+    let res=await wfetch(`date_preset=${bidPreset}&fields=${BID_FIELDS}`);
+    if(!res.ok){ bidNoImg=true; res=await wfetch(`date_preset=${bidPreset}&fields=${BID_FIELDS_NOIMG}`); if(!res.ok) throw new Error("HTTP "+res.status); }
+    else bidNoImg=false;
     bidRaw=((await res.json()).data||[]).map(r=>({
-      account:acctOf(r), date:r.date,
-      spend:+r.spend||0, impressions:+r.impressions||0, clicks:+r.clicks||0,
-      link_clicks:+r.link_clicks||0, video_views:+r.video_views||0,
-      post_engagement:+r.post_engagement||0, leads:+r.leads||0
+      account:acctOf(r), campaign:r.campaign||"(ไม่ระบุแคมเปญ)",
+      adset:r.adset_name||"(ไม่ระบุ adset)", ad:r.ad_name||"(ไม่ระบุ ad)",
+      thumb:r.thumbnail_url||"", date:r.date,
+      spend:+r.spend||0, impressions:+r.impressions||0, reach:+r.reach||0, clicks:+r.clicks||0
     }));
     bidLoaded=true;
+    if(bidAuto){ // ครั้งแรก: เลือกบัญชี Pao อัตโนมัติถ้ามี
+      const pacc=[...new Set(bidRaw.map(r=>r.account))].find(a=>/pao/i.test(a));
+      if(pacc) bidAccount=pacc;
+      bidAuto=false;
+    }
     renderBidAccountFilter();
+    renderBidCampaigns();
     renderBiddable();
-    loadBreakdown();
   }catch(e){
     document.getElementById("bidContent").innerHTML=`<div class="error">❌ ดึงข้อมูลไม่สำเร็จ: ${e.message}</div>`;
   }
@@ -669,163 +673,140 @@ function renderBidAccountFilter(){
     accounts.map(a=>`<option value="${a.replace(/"/g,'&quot;')}"${a===bidAccount?' selected':''}>${a}</option>`).join("");
 }
 
-function renderBiddable(){
-  bidCharts.forEach(c=>c.destroy()); bidCharts=[];
-  const data=bidRaw.filter(r=>bidAccount==="__all__"||r.account===bidAccount);
-  const dates=[...new Set(data.map(r=>r.date))].sort();
-  document.getElementById("bidRangeLabel").textContent = dates.length
-    ? `${dates[0]} → ${dates[dates.length-1]} · ${bidAccount==="__all__"?"ทุกบัญชี":bidAccount} · ${data.length} แถว`
-    : "ไม่มีข้อมูลในช่วงที่เลือก";
-
-  if(!dates.length){ document.getElementById("bidContent").innerHTML='<div class="loading">ไม่มีข้อมูลในช่วงที่เลือก</div>'; return; }
-
-  // รวมยอดรายวัน
-  const by={}; dates.forEach(d=>by[d]={spend:0,impressions:0,clicks:0,link_clicks:0,video_views:0,post_engagement:0,leads:0});
-  data.forEach(r=>{ const b=by[r.date]; if(!b) return; for(const k in b) b[k]+=r[k]||0; });
-
-  const cards = BID_METRICS.map(m=>{
-    const useDenom = d => { let v=by[d][m.denom]; if(!v && m.fallback) v=by[d][m.fallback]; return v; };
-    const series = dates.map(d=>{ const den=useDenom(d); return den? by[d].spend/den*m.mult : null; });
-    const hasData = series.some(v=>v!==null && v>0);
-    const totSpend = dates.reduce((s,d)=>s+by[d].spend,0);
-    const totDen   = dates.reduce((s,d)=>s+(useDenom(d)||0),0);
-    const avg = totDen ? totSpend/totDen*m.mult : 0;
-    return {m, series, hasData, avg};
-  });
-
-  document.getElementById("bidContent").innerHTML=`
-    <div class="bid-grid">
-      ${cards.map(c=>`
-        <div class="bid-card ${c.hasData?'':'empty'}">
-          <div class="bc-head">
-            <div class="bc-title">${c.m.label}</div>
-            <div class="bc-avg">${c.hasData?c.m.unit+c.avg.toFixed(2):'—'}</div>
-          </div>
-          <div class="bc-sub">${c.m.sub}${c.hasData?' · เฉลี่ยทั้งช่วง':''}</div>
-          ${c.hasData?`<canvas id="bid-${c.m.key}"></canvas>`:'<div class="bc-none">ไม่มีข้อมูลสำหรับ metric นี้</div>'}
-        </div>`).join("")}
-    </div>
-    <div class="footnote">CPV/CPE/CPL จะว่างหากแคมเปญไม่มี video views / engagement / leads tracking · ตัวเลขมุมขวาบนคือค่าเฉลี่ยรวมทั้งช่วง (spend รวม ÷ ยอดรวมของตัวหาร)</div>`;
-
-  cards.filter(c=>c.hasData).forEach(c=>drawBidChart(c, dates));
-}
-
-function drawBidChart(c, dates){
-  const grad=ctx=>{ const g=ctx.createLinearGradient(0,0,0,180); g.addColorStop(0,"rgba(253,210,5,.4)"); g.addColorStop(1,"rgba(253,210,5,0)"); return g; };
-  bidCharts.push(new Chart(document.getElementById("bid-"+c.m.key),{
-    type:"line",
-    data:{labels:dates,datasets:[{
-      label:c.m.label, data:c.series, spanGaps:true,
-      borderColor:"#ebc300", backgroundColor:ctx=>grad(ctx.chart.ctx),
-      fill:true, tension:.35, pointRadius:0, borderWidth:2.5
-    }]},
-    options:{responsive:true,interaction:{mode:"index",intersect:false},
-      plugins:{legend:{display:false},
-        tooltip:{callbacks:{label:v=>` ${c.m.unit}${(v.parsed.y??0).toFixed(2)}`}}},
-      scales:{
-        x:{ticks:{color:"#969A9E",font:{family:'JetBrains Mono',size:9},maxTicksLimit:8},grid:{display:false}},
-        y:{ticks:{color:"#969A9E",font:{family:'JetBrains Mono',size:9},callback:v=>c.m.unit+v},grid:{color:"#E2E4E6"}}
-      }}
-  }));
-}
-
-/* ---------------- BIDDABLE — campaign breakdown ---------------- */
-let brkRaw=[], brkCampaign="", brkNoImg=false;
-const fmtK = n => n>=1000 ? (n/1000).toFixed(n>=10000?0:1)+"K" : fmtInt(n);
-
-async function loadBreakdown(){
-  const sub=document.getElementById("brkSub");
-  try{
-    let res=await wfetch(`date_preset=${bidPreset}&fields=${BRK_FIELDS}`);
-    if(!res.ok){ brkNoImg=true; res=await wfetch(`date_preset=${bidPreset}&fields=${BRK_FIELDS_NOIMG}`); }
-    else brkNoImg=false;
-    brkRaw=((await res.json()).data||[]).map(r=>({
-      account:acctOf(r), campaign:r.campaign||"(ไม่ระบุแคมเปญ)",
-      adset:r.adset_name||"(ไม่ระบุ adset)", ad:r.ad_name||"(ไม่ระบุ ad)",
-      thumb:r.thumbnail_url||"", spend:+r.spend||0, impressions:+r.impressions||0,
-      reach:+r.reach||0, clicks:+r.clicks||0
-    }));
-  }catch(e){
-    brkRaw=[]; sub.textContent="โหลด breakdown ไม่สำเร็จ: "+e.message; return;
-  }
-  renderBidCampaigns();
-  renderTree();
-}
-
 function renderBidCampaigns(){
   const sel=document.getElementById("bidCampaign");
-  const rows=brkRaw.filter(r=>bidAccount==="__all__"||r.account===bidAccount);
-  // จัดเรียงแคมเปญตาม spend มาก→น้อย
+  const rows=bidRaw.filter(r=>bidAccount==="__all__"||r.account===bidAccount);
   const spendBy={}; rows.forEach(r=>spendBy[r.campaign]=(spendBy[r.campaign]||0)+r.spend);
   const camps=Object.keys(spendBy).sort((a,b)=>spendBy[b]-spendBy[a]);
-  if(brkCampaign && !camps.includes(brkCampaign)) brkCampaign="";
-  // เลือกอัตโนมัติถ้าพบแคมเปญ Pao Society (จากคำขอ) หรือแคมเปญ spend สูงสุด
-  if(!brkCampaign){
-    const pao=camps.find(c=>/pao\s*society/i.test(c));
-    brkCampaign = pao || "";
-  }
-  sel.innerHTML=`<option value="">— เลือกแคมเปญ (${camps.length}) —</option>`+
-    camps.map(c=>`<option value="${c.replace(/"/g,'&quot;')}"${c===brkCampaign?' selected':''}>${c} · ${fmtMoney(spendBy[c])}</option>`).join("");
+  if(bidCampaign && !camps.includes(bidCampaign)) bidCampaign="";
+  // เลือกอัตโนมัติถ้าพบแคมเปญ Pao Society (จากคำขอ)
+  if(!bidCampaign){ const pao=camps.find(c=>/pao\s*society/i.test(c))||camps.find(c=>/society/i.test(c)); if(pao) bidCampaign=pao; }
+  sel.innerHTML=`<option value="">— ทุกแคมเปญ (${camps.length}) —</option>`+
+    camps.map(c=>`<option value="${c.replace(/"/g,'&quot;')}"${c===bidCampaign?' selected':''}>${c} · ${fmtMoney(spendBy[c])}</option>`).join("");
 }
 
-function renderTree(){
-  const tree=document.getElementById("bidTree"), sub=document.getElementById("brkSub");
-  if(!brkCampaign){ tree.innerHTML=""; sub.textContent="เลือกแคมเปญเพื่อดู breakdown ตาม adset และ ads พร้อม creative"; return; }
-  const rows=brkRaw.filter(r=>(bidAccount==="__all__"||r.account===bidAccount)&&r.campaign===brkCampaign);
-  if(!rows.length){ tree.innerHTML='<div class="loading">ไม่มีข้อมูลสำหรับแคมเปญนี้</div>'; return; }
+function renderBiddable(){
+  if(bidChart){ bidChart.destroy(); bidChart=null; }
+  bidSel=-1;
+  const data=bidRaw.filter(r=>(bidAccount==="__all__"||r.account===bidAccount)&&(!bidCampaign||r.campaign===bidCampaign));
+  const dates=[...new Set(data.map(r=>r.date))].sort();
+  document.getElementById("bidRangeLabel").textContent = dates.length
+    ? `${dates[0]} → ${dates[dates.length-1]} · ${bidAccount==="__all__"?"ทุกบัญชี":bidAccount}${bidCampaign?" · "+bidCampaign:""}`
+    : "ไม่มีข้อมูลในช่วง/บัญชีที่เลือก";
 
-  // group: adset -> ad
-  const sets={};
-  rows.forEach(r=>{
-    if(!sets[r.adset]) sets[r.adset]={name:r.adset,spend:0,impressions:0,reach:0,clicks:0,ads:{}};
-    const s=sets[r.adset]; s.spend+=r.spend; s.impressions+=r.impressions; s.reach+=r.reach; s.clicks+=r.clicks;
-    if(!s.ads[r.ad]) s.ads[r.ad]={name:r.ad,thumb:"",spend:0,impressions:0,reach:0,clicks:0};
-    const a=s.ads[r.ad]; a.spend+=r.spend; a.impressions+=r.impressions; a.reach+=r.reach; a.clicks+=r.clicks;
-    if(!a.thumb && r.thumb) a.thumb=r.thumb;
-  });
-  const setList=Object.values(sets).sort((a,b)=>b.spend-a.spend);
-  const totSpend=setList.reduce((s,x)=>s+x.spend,0);
-  sub.textContent=`${brkCampaign} · ${setList.length} adsets · รวม ${fmtMoney(totSpend)}${brkNoImg?' · (Windsor ไม่ส่ง thumbnail — แสดงเฉพาะชื่อ)':''}`;
+  if(!dates.length){ document.getElementById("bidContent").innerHTML='<div class="loading">ไม่มีข้อมูลในช่วง/บัญชีที่เลือก</div>'; return; }
 
-  const metric=(k,v)=>`<span class="mk">${k}</span><span class="mv">${v}</span>`;
-  tree.innerHTML=setList.map((s,i)=>{
-    const cpm=s.impressions?s.spend/s.impressions*1000:0, cpc=s.clicks?s.spend/s.clicks:0, ctr=s.impressions?s.clicks/s.impressions:0;
-    const ads=Object.values(s.ads).sort((a,b)=>b.spend-a.spend);
-    const adCards=ads.map(a=>{
-      const acpm=a.impressions?a.spend/a.impressions*1000:0, acpc=a.clicks?a.spend/a.clicks:0, actr=a.impressions?a.clicks/a.impressions:0;
-      const thumb=a.thumb
-        ? `<img class="brk-thumb" src="${a.thumb}" alt="" loading="lazy" onerror="this.className='brk-thumb ph';this.removeAttribute('src');this.textContent='🖼';">`
-        : `<div class="brk-thumb ph">🖼</div>`;
-      return `<div class="brk-ad">${thumb}
-        <div class="brk-ad-body">
-          <div class="brk-ad-name" title="${a.name.replace(/"/g,'&quot;')}">${a.name}</div>
-          <div class="brk-metrics">
-            ${metric("Spend",fmtMoney(a.spend))}${metric("Impr.",fmtK(a.impressions))}
-            ${metric("Reach",fmtK(a.reach))}${metric("CTR",fmtPct(actr))}
-            ${metric("CPM","฿"+acpm.toFixed(1))}${metric("CPC","฿"+acpc.toFixed(2))}
-          </div>
-        </div></div>`;
-    }).join("");
-    return `<div class="brk-adset">
-      <div class="brk-adset-head" onclick="toggleAdset(${i})">
-        <span class="car" id="scar-${i}">▾</span>
-        <span class="brk-adset-name" title="${s.name.replace(/"/g,'&quot;')}">${s.name}</span>
-        <span class="brk-adset-meta">${ads.length} ads · ${fmtMoney(s.spend)} · CPM ฿${cpm.toFixed(1)} · CTR ${fmtPct(ctr)}</span>
-      </div>
-      <div class="brk-ads" id="sads-${i}">${adCards}</div>
+  // KPI รวมของบัญชี/แคมเปญที่เลือก
+  const t=data.reduce((a,r)=>{a.spend+=r.spend;a.impr+=r.impressions;a.reach+=r.reach;a.clicks+=r.clicks;return a;},{spend:0,impr:0,reach:0,clicks:0});
+  const cpm=t.impr?t.spend/t.impr*1000:0, cpc=t.clicks?t.spend/t.clicks:0, ctr=t.impr?t.clicks/t.impr:0, freq=t.reach?t.impr/t.reach:0;
+  const kpi=(l,v)=>`<div class="kpi"><div class="klabel">${l}</div><div class="kval">${v}</div></div>`;
+
+  bidCreatives = buildCreatives(data);
+  const creBlock = bidCampaign
+    ? (bidCreatives.length
+        ? `<div class="cre-grid">${bidCreatives.map((c,i)=>creCard(c,i)).join("")}</div><div id="creDetail"></div>`
+        : '<div class="bc-none">ไม่พบ creative ในแคมเปญนี้</div>')
+    : '<div class="footnote">เลือกแคมเปญด้านบนเพื่อดู creative แต่ละตัว แล้วคลิกที่ creative เพื่อดูข้อมูลรายวัน</div>';
+
+  document.getElementById("bidContent").innerHTML=`
+    <div class="kpis">
+      ${kpi("Spend",fmtMoney(t.spend))}${kpi("Reach",fmtK(t.reach))}${kpi("Impressions",fmtK(t.impr))}
+      ${kpi("Clicks",fmtK(t.clicks))}${kpi("CPM","฿"+cpm.toFixed(2))}${kpi("CPC","฿"+cpc.toFixed(2))}
+      ${kpi("CTR",fmtPct(ctr))}${kpi("Frequency",freq.toFixed(2))}
+    </div>
+    <div class="panel" style="margin-bottom:16px">
+      <div class="panel-head"><h3>Spend & Reach รายวัน</h3></div>
+      <div class="psub">แนวโน้มต้นทุนและการเข้าถึงของ${bidCampaign?"แคมเปญ":"บัญชี"}ที่เลือก</div>
+      <canvas id="bidTrend"></canvas>
+    </div>
+    <div class="panel">
+      <div class="panel-head"><h3>🎨 Creative Breakdown</h3><span style="color:var(--muted);font-size:12px">${bidCampaign?bidCreatives.length+" creatives":""}</span></div>
+      <div class="psub">${bidCampaign?"คลิกที่ creative เพื่อดูข้อมูลรายวันแยกแต่ละตัว":"—"}${bidNoImg?' · (Windsor ไม่ส่ง thumbnail — แสดงเฉพาะชื่อ)':''}</div>
+      ${creBlock}
     </div>`;
-  }).join("");
+
+  drawBidTrend(data,dates);
 }
 
-function toggleAdset(i){
-  const el=document.getElementById("sads-"+i), car=document.getElementById("scar-"+i);
-  const hide=el.style.display!=="none"; el.style.display=hide?"none":"grid";
-  if(car) car.textContent=hide?"▸":"▾";
+function buildCreatives(data){
+  const m={};
+  data.forEach(r=>{
+    const k=r.ad+"||"+r.adset;
+    if(!m[k]) m[k]={ad:r.ad,adset:r.adset,thumb:"",spend:0,impressions:0,reach:0,clicks:0,days:{}};
+    const c=m[k]; c.spend+=r.spend;c.impressions+=r.impressions;c.reach+=r.reach;c.clicks+=r.clicks;
+    if(!c.thumb && r.thumb) c.thumb=r.thumb;
+    if(!c.days[r.date]) c.days[r.date]={spend:0,impr:0,reach:0,clicks:0};
+    const d=c.days[r.date]; d.spend+=r.spend;d.impr+=r.impressions;d.reach+=r.reach;d.clicks+=r.clicks;
+  });
+  return Object.values(m).sort((a,b)=>b.spend-a.spend);
+}
+
+function creCard(c,i){
+  const cpm=c.impressions?c.spend/c.impressions*1000:0, ctr=c.impressions?c.clicks/c.impressions:0;
+  const metric=(k,v)=>`<span class="mk">${k}</span><span class="mv">${v}</span>`;
+  const thumb=c.thumb
+    ? `<img class="cre-thumb" src="${c.thumb}" alt="" loading="lazy" onerror="this.className='cre-thumb ph';this.removeAttribute('src');this.textContent='🖼';">`
+    : `<div class="cre-thumb ph">🖼</div>`;
+  return `<div class="cre-card" id="cre-${i}" onclick="selectCreative(${i})">
+    ${thumb}
+    <div class="cre-body">
+      <div class="cre-name" title="${c.ad.replace(/"/g,'&quot;')}">${c.ad}</div>
+      <div class="cre-adset" title="${c.adset.replace(/"/g,'&quot;')}">${c.adset}</div>
+      <div class="brk-metrics">
+        ${metric("Spend",fmtMoney(c.spend))}${metric("Reach",fmtK(c.reach))}
+        ${metric("CPM","฿"+cpm.toFixed(1))}${metric("CTR",fmtPct(ctr))}
+      </div>
+    </div>
+  </div>`;
+}
+
+function selectCreative(i){
+  document.querySelectorAll(".cre-card").forEach(x=>x.classList.remove("sel"));
+  const card=document.getElementById("cre-"+i); if(card) card.classList.add("sel");
+  bidSel=i;
+  const c=bidCreatives[i], det=document.getElementById("creDetail"); if(!c||!det) return;
+  const days=Object.entries(c.days).sort((a,b)=>a[0].localeCompare(b[0]));
+  const rows=days.map(([dt,v])=>{
+    const cpm=v.impr?v.spend/v.impr*1000:0, ctr=v.impr?v.clicks/v.impr:0, cpc=v.clicks?v.spend/v.clicks:0;
+    return `<tr><td class="camp">${dt}</td><td>${fmtMoney(v.spend)}</td><td>${fmtInt(v.impr)}</td><td>${fmtInt(v.reach)}</td><td>${fmtPct(ctr)}</td><td>฿${cpm.toFixed(1)}</td><td>฿${cpc.toFixed(2)}</td></tr>`;
+  }).join("");
+  det.innerHTML=`
+    <div class="cre-detail">
+      <div style="display:flex;justify-content:space-between;align-items:center;gap:12px;margin-bottom:10px">
+        <h3 style="font-size:15px">📊 ${c.ad}</h3>
+        <span style="color:var(--muted);font-size:12px;white-space:nowrap">${c.adset} · ${days.length} วัน</span>
+      </div>
+      <div style="overflow-x:auto">
+        <table><thead><tr>
+          <th>วันที่</th><th>Spend</th><th>Impr.</th><th>Reach</th><th>CTR</th><th>CPM</th><th>CPC</th>
+        </tr></thead><tbody>${rows}</tbody></table>
+      </div>
+    </div>`;
+  det.scrollIntoView({behavior:"smooth",block:"nearest"});
+}
+
+function drawBidTrend(data,dates){
+  const by={}; dates.forEach(d=>by[d]={spend:0,reach:0});
+  data.forEach(r=>{ if(by[r.date]){by[r.date].spend+=r.spend;by[r.date].reach+=r.reach;} });
+  const grad=ctx=>{ const g=ctx.createLinearGradient(0,0,0,300); g.addColorStop(0,"rgba(253,210,5,.45)"); g.addColorStop(1,"rgba(253,210,5,0)"); return g; };
+  bidChart=new Chart(document.getElementById("bidTrend"),{
+    data:{labels:dates,datasets:[
+      {type:"line",label:"Spend (฿)",data:dates.map(d=>by[d].spend),yAxisID:"y",borderColor:"#ebc300",backgroundColor:c=>grad(c.chart.ctx),fill:true,tension:.4,pointRadius:0,borderWidth:2.5},
+      {type:"line",label:"Reach",data:dates.map(d=>by[d].reach),yAxisID:"y1",borderColor:"#969A9E",backgroundColor:"#969A9E",tension:.4,pointRadius:0,borderWidth:1.5,borderDash:[4,3]}
+    ]},
+    options:{responsive:true,interaction:{mode:"index",intersect:false},
+      plugins:{legend:{labels:{color:"#6b7178",usePointStyle:true,boxWidth:8}}},
+      scales:{
+        x:{ticks:{color:"#969A9E",font:{family:'JetBrains Mono',size:10},maxTicksLimit:10},grid:{display:false}},
+        y:{position:"left",ticks:{color:"#ebc300",font:{family:'JetBrains Mono',size:10}},grid:{color:"#E2E4E6"}},
+        y1:{position:"right",ticks:{color:"#969A9E",font:{family:'JetBrains Mono',size:10}},grid:{drawOnChartArea:false}}
+      }}
+  });
 }
 
 /* ---------------- events ---------------- */
-document.getElementById("bidCampaign").onchange=e=>{ brkCampaign=e.target.value; renderTree(); };
-document.getElementById("bidAccountFilter").onchange=e=>{ bidAccount=e.target.value; renderBiddable(); renderBidCampaigns(); renderTree(); };
+document.getElementById("bidCampaign").onchange=e=>{ bidCampaign=e.target.value; renderBiddable(); };
+document.getElementById("bidAccountFilter").onchange=e=>{ bidAccount=e.target.value; bidCampaign=""; renderBidCampaigns(); renderBiddable(); };
 document.getElementById("bidRefresh").onclick=()=>{ bidLoaded=false; loadBiddable(); };
 document.getElementById("bidDatePills").onclick=e=>{
   const p=e.target.closest(".pill"); if(!p) return;
