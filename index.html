@@ -247,12 +247,35 @@
 
 <!-- ===================== ACTIVE AD ACCOUNT ===================== -->
 <section id="activeacctView" style="display:none">
-  <h1 style="margin-bottom:6px">Active Ad account</h1>
-  <div class="sub" style="margin-bottom:18px">สถานะบัญชีโฆษณาทั้งหมด (Active / Inactive)</div>
-  <div class="pills" id="acctStatusFilter" style="width:fit-content;margin-bottom:18px">
-    <div class="pill active" data-v="all">ทั้งหมด</div>
-    <div class="pill" data-v="active">🟢 Active</div>
-    <div class="pill" data-v="inactive">⚪ Inactive</div>
+  <div class="landing-head">
+    <div>
+      <h1 style="margin-bottom:6px">Active Ad account</h1>
+      <div class="sub">สถานะบัญชีโฆษณาทั้งหมด (Active / Inactive)</div>
+    </div>
+    <div class="kpi primary" style="min-width:190px">
+      <div class="klabel">Total Budget</div>
+      <div class="kval" id="acctTotalBudget">฿0</div>
+    </div>
+  </div>
+  <div style="display:flex;gap:12px;flex-wrap:wrap;align-items:center;margin-bottom:18px">
+    <div class="pills" id="acctStatusFilter">
+      <div class="pill active" data-v="all">ทั้งหมด</div>
+      <div class="pill" data-v="active">🟢 Active</div>
+      <div class="pill" data-v="inactive">⚪ Inactive</div>
+    </div>
+    <div class="pills" id="acctDatePills">
+      <div class="pill active" data-v="last_7d">7 วัน</div>
+      <div class="pill" data-v="last_14d">14 วัน</div>
+      <div class="pill" data-v="last_30d">30 วัน</div>
+      <div class="pill" data-v="this_month">เดือนนี้</div>
+      <div class="pill" data-v="last_month">เดือนก่อน</div>
+    </div>
+    <div class="range">
+      <input type="date" id="acctDFrom" title="วันเริ่มต้น">
+      <span class="rdash">–</span>
+      <input type="date" id="acctDTo" title="วันสิ้นสุด">
+      <button id="acctApplyRange">ใช้</button>
+    </div>
   </div>
   <div id="activeAcctContent"><div class="loading">กำลังดึงข้อมูลจาก Windsor…</div></div>
 </section>
@@ -490,13 +513,17 @@ function render(){
 /* ---------------- ACTIVE AD ACCOUNT ---------------- */
 let activeAcctData = [];
 let activeAcctFilter = "all";
+let acctPreset = "last_7d", acctCustomFrom = "", acctCustomTo = "";
+const ACCT_PRESET_LABEL = {last_7d:"7 วัน",last_14d:"14 วัน",last_30d:"30 วัน",this_month:"เดือนนี้",last_month:"เดือนก่อน",custom:"ช่วงที่เลือก"};
+
 async function loadActiveAccounts(){
   if(!ensureKey(false)){
     document.getElementById("activeAcctContent").innerHTML='<div class="error">ยังไม่มี API key — กดปุ่ม “🔑 Key”</div>'; return;
   }
   document.getElementById("activeAcctContent").innerHTML='<div class="loading">กำลังดึงข้อมูลจาก Windsor…</div>';
+  const range = acctPreset==="custom" ? `date_from=${acctCustomFrom}&date_to=${acctCustomTo}` : `date_preset=${acctPreset}`;
   try{
-    const res = await wfetch(`date_preset=last_7d&fields=account_name,campaign_status,spend`);
+    const res = await wfetch(`${range}&fields=account_name,campaign_status,spend`);
     if(!res.ok) throw new Error("HTTP "+res.status);
     const rows=(await res.json()).data||[];
     const map={};
@@ -516,6 +543,9 @@ async function loadActiveAccounts(){
 function renderActiveAccounts(){
   const list=activeAcctData.filter(a=>
     activeAcctFilter==="all" || (activeAcctFilter==="active"?a.active:!a.active));
+  const periodLabel = ACCT_PRESET_LABEL[acctPreset] || "";
+  const total = list.reduce((s,a)=>s+a.spend,0);
+  document.getElementById("acctTotalBudget").textContent = fmtMoney(total);
   const rows=list.map(a=>`
     <div class="acct-row">
       <div class="acct-ico">${a.active?'🟢':'⚪'}</div>
@@ -523,7 +553,7 @@ function renderActiveAccounts(){
         <div class="acct-name">${a.name}</div>
         <div class="acct-id">${a.active?'<span class="tag active">ACTIVE</span>':'<span class="tag paused">INACTIVE</span>'}</div>
       </div>
-      <div class="acct-meta"><div class="spend">${fmtMoney(a.spend)}</div><div class="cap">Spend 7 วัน</div></div>
+      <div class="acct-meta"><div class="spend">${fmtMoney(a.spend)}</div><div class="cap">Spend ${periodLabel}</div></div>
     </div>`).join("");
   document.getElementById("activeAcctContent").innerHTML = rows || '<div class="loading">ไม่พบ Ad Account ตามตัวกรองนี้</div>';
 }
@@ -810,6 +840,21 @@ document.getElementById("acctStatusFilter").onclick=e=>{
   document.querySelectorAll("#acctStatusFilter .pill").forEach(x=>x.classList.remove("active"));
   p.classList.add("active"); activeAcctFilter=p.dataset.v;
   renderActiveAccounts();
+};
+document.getElementById("acctDatePills").onclick=e=>{
+  const p=e.target.closest(".pill"); if(!p) return;
+  document.querySelectorAll("#acctDatePills .pill").forEach(x=>x.classList.remove("active"));
+  p.classList.add("active"); acctPreset=p.dataset.v;
+  document.getElementById("acctDFrom").value=""; document.getElementById("acctDTo").value="";
+  loadActiveAccounts();
+};
+document.getElementById("acctApplyRange").onclick=()=>{
+  const f=document.getElementById("acctDFrom").value, t=document.getElementById("acctDTo").value;
+  if(!f||!t){ alert("กรุณาเลือกทั้งวันเริ่มต้นและวันสิ้นสุด"); return; }
+  if(f>t){ alert("วันเริ่มต้นต้องไม่เกินวันสิ้นสุด"); return; }
+  acctCustomFrom=f; acctCustomTo=t; acctPreset="custom";
+  document.querySelectorAll("#acctDatePills .pill").forEach(x=>x.classList.remove("active"));
+  loadActiveAccounts();
 };
 document.getElementById("acctSearch").oninput=()=>{ if(landingAccts.length){ const g=landingAccts.reduce((s,a)=>s+a.spend,0); renderLanding(g); } };
 document.getElementById("datePills").onclick=e=>{
