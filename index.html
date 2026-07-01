@@ -326,7 +326,7 @@ const FIELDS = "source,account_name,account_id,campaign,campaign_status,objectiv
 const PREV_FIELDS = "source,account_name,spend,impressions,reach,clicks";
 const BID_BASE = "source,account_name,account_id,campaign,adset_name,ad_name,spend,impressions,reach,clicks,date";
 // ไล่ระดับ field เสริม (thumbnail + ลิงก์โพสต์) — ลองชุดครบสุดก่อน ถ้า connector ไม่รองรับค่อยถอย
-const BID_OPT_TIERS = ["thumbnail_url,permalink_url","thumbnail_url,object_story_id","thumbnail_url",""];
+const BID_OPT_TIERS = ["thumbnail_url,object_story_id,permalink_url","thumbnail_url,object_story_id","thumbnail_url",""];
 // object_story_id = "{pageid}_{postid}" → แปลงเป็น URL โพสต์จริง
 function storyToUrl(s){ if(!s) return ""; s=String(s); if(/^https?:/i.test(s)) return s; const p=s.split("_"); return p.length>=2 ? `https://www.facebook.com/${p[0]}/posts/${p[1]}` : ""; }
 // Facebook Page Insights (connector=facebook_organic) — ข้อมูลโพสต์จริง: permalink, reactions, organic/paid
@@ -696,14 +696,13 @@ async function loadOrganic(){
   if(bidSel>=0) selectCreative(bidSel);
 }
 
-// จับคู่ creative (ad) กับโพสต์จริง โดยเทียบข้อความ
+// จับคู่ creative (ad) กับโพสต์จริง ด้วย post id (object_story_id ↔ post_id)
+// รูปแบบ id = "{pageid}_{postid}" → เทียบเฉพาะส่วน postid ท้ายสุด (page id อาจต่างกัน)
+const postSuffix=s=>{ const p=String(s||"").split("_"); return p.length>=2?p[p.length-1]:(String(s||"").match(/(\d{6,})\/?$/)||[])[1]||""; };
 function matchOrgPost(c){
-  if(!orgPosts.length) return null;
-  const norm=s=>String(s||"").replace(/\s+/g,"").toLowerCase();
-  const ad=norm(c.ad);
-  if(ad.length<4) return null;
-  const key=ad.slice(0,30);
-  return orgPosts.find(p=>{ const msg=norm(p.message); return msg && (msg.includes(key)||ad.includes(msg.slice(0,30))); }) || null;
+  if(!orgPosts.length || !c.storyId) return null;
+  const cs=postSuffix(c.storyId); if(!cs) return null;
+  return orgPosts.find(p=>postSuffix(p.id)===cs) || null;
 }
 const fmtK = n => n>=1000 ? (n/1000).toFixed(n>=10000?0:1)+"K" : fmtInt(n);
 
@@ -731,7 +730,7 @@ async function loadBiddable(){
     bidRaw=data.map(r=>({
       account:acctOf(r), campaign:r.campaign||"(ไม่ระบุแคมเปญ)",
       adset:r.adset_name||"(ไม่ระบุ adset)", ad:r.ad_name||"(ไม่ระบุ ad)",
-      thumb:r.thumbnail_url||"", link:r.permalink_url||storyToUrl(r.object_story_id), date:r.date,
+      thumb:r.thumbnail_url||"", storyId:r.object_story_id||"", link:r.permalink_url||storyToUrl(r.object_story_id), date:r.date,
       spend:+r.spend||0, impressions:+r.impressions||0, reach:+r.reach||0, clicks:+r.clicks||0
     }));
     bidLoaded=true;
@@ -816,10 +815,11 @@ function buildCreatives(data){
   const m={};
   data.forEach(r=>{
     const k=r.ad+"||"+r.adset;
-    if(!m[k]) m[k]={ad:r.ad,adset:r.adset,thumb:"",link:"",spend:0,impressions:0,reach:0,clicks:0,days:{}};
+    if(!m[k]) m[k]={ad:r.ad,adset:r.adset,thumb:"",link:"",storyId:"",spend:0,impressions:0,reach:0,clicks:0,days:{}};
     const c=m[k]; c.spend+=r.spend;c.impressions+=r.impressions;c.reach+=r.reach;c.clicks+=r.clicks;
     if(!c.thumb && r.thumb) c.thumb=r.thumb;
     if(!c.link && r.link) c.link=r.link;
+    if(!c.storyId && r.storyId) c.storyId=r.storyId;
     if(!c.days[r.date]) c.days[r.date]={spend:0,impr:0,reach:0,clicks:0};
     const d=c.days[r.date]; d.spend+=r.spend;d.impr+=r.impressions;d.reach+=r.reach;d.clicks+=r.clicks;
   });
@@ -870,8 +870,9 @@ function selectCreative(i){
     ? `<a href="${link}" target="_blank" rel="noopener" title="เปิดโพสต์จริงบน Facebook">${imgTag}</a>`
     : imgTag;
   // ถ้า match โพสต์ organic ได้ → ใช้ค่าจริง (organic/paid split); ไม่งั้น fallback เป็นค่า ads (paid≈total)
+  // connector คืน organic/paid ของ "impressions" จริง แต่ของ "reach (unique)" เป็น null → แสดง — สำหรับ reach แยก
   const R = post
-    ? {tr:post.reach||totReach, or:post.reachOrg, pr:post.reachPaid||totReach, ti:post.impr||totImpr, oi:post.imprOrg, pi:post.imprPaid||totImpr}
+    ? {tr:post.reach||totReach, or:null, pr:null, ti:post.impr||totImpr, oi:post.imprOrg, pi:post.imprPaid}
     : {tr:totReach, or:null, pr:totReach, ti:totImpr, oi:null, pi:totImpr};
   det.innerHTML=`
     <div class="cre-detail">
@@ -972,6 +973,8 @@ document.getElementById("bidDebug").onclick=async()=>{
   const box=document.getElementById("dbg");
   const tries=[["min (post_id,permalink_url,message)","post_id,permalink_url,message"],["date only","date"],["rich (tier0)",ORG_TIERS[0]]];
   let html='<b>🔧 facebook_organic debug</b> <button onclick="this.closest(\'#dbg\').remove()" style="float:right">ปิด</button>';
+  const sids=(bidCreatives||[]).map(c=>`${c.ad} → object_story_id="${c.storyId||"(ว่าง)"}"`).join("<br>");
+  html+=`<div style="margin-top:10px"><b>ads object_story_id (join key)</b><pre style="white-space:pre-wrap;font-size:11px;max-height:140px;overflow:auto;background:var(--well);padding:8px;border-radius:4px;margin-top:4px">${(sids||"(ยังไม่มี creatives — เลือกแคมเปญก่อน)").replace(/</g,"&lt;")}</pre></div>`;
   for(const [name,f] of tries){
     try{
       const res=await wfetch(`date_preset=${bidPreset}&fields=${f}`,"facebook_organic");
