@@ -141,7 +141,27 @@
   .cre-body{padding:10px 12px}
   .cre-name{font-size:13px;font-weight:600;color:var(--ink);line-height:1.35;max-height:2.7em;overflow:hidden}
   .cre-adset{font-size:11px;color:var(--muted);margin:2px 0 4px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
-  .cre-detail{margin-top:16px;border:1px solid var(--border);border-radius:8px;padding:16px;background:var(--well)}
+  .cre-detail{margin-top:16px;border:1px solid var(--border);border-radius:8px;padding:20px;background:var(--surface)}
+
+  /* ===== Post performance card (สไตล์ Performance for your post) ===== */
+  .post-perf{display:grid;grid-template-columns:300px 1fr;gap:26px}
+  @media(max-width:760px){.post-perf{grid-template-columns:1fr}}
+  .pp-left{background:#f7f7f8;border:1px solid var(--border);border-radius:6px;padding:14px}
+  .pp-page{color:#4267B2;font-weight:700;font-size:16px;margin-bottom:8px}
+  .pp-msg{font-size:12px;color:var(--text);line-height:1.55;white-space:pre-wrap;margin-bottom:10px;max-height:170px;overflow:auto}
+  .pp-img{width:100%;border-radius:4px;display:block}
+  .pp-img.ph{aspect-ratio:1/1;background:var(--well);display:flex;align-items:center;justify-content:center;font-size:44px;color:var(--gray)}
+  .pp-right h3{font-size:21px;font-weight:700;margin-bottom:14px}
+  .pp-meta{display:grid;grid-template-columns:130px 1fr;gap:9px 14px;margin-bottom:20px;font-size:14px}
+  .pp-meta .k{color:var(--text)}
+  .pp-meta .v{font-weight:700;word-break:break-word}
+  .pp-meta .v a{color:#1a73e8}
+  .pp-sec{font-weight:700;font-size:16px;border-bottom:2px solid var(--ink);display:inline-block;margin-bottom:12px}
+  .pp-box{background:#f0f1f2;border-radius:2px;padding:16px 20px;display:grid;grid-template-columns:repeat(3,1fr);gap:16px 14px;margin-bottom:24px}
+  .pp-stat b{font-family:'JetBrains Mono',monospace;font-size:19px;font-weight:700;display:block;color:var(--ink)}
+  .pp-stat.na b{color:var(--gray)}
+  .pp-stat span{font-size:12px;color:var(--muted)}
+  .pp-note{font-size:11px;color:var(--muted);margin:-14px 0 20px}
 
   /* ===== Landing ===== */
   .landing-head{display:flex;justify-content:space-between;align-items:flex-start;gap:16px;margin-bottom:6px}
@@ -765,21 +785,76 @@ function selectCreative(i){
   const card=document.getElementById("cre-"+i); if(card) card.classList.add("sel");
   bidSel=i;
   const c=bidCreatives[i], det=document.getElementById("creDetail"); if(!c||!det) return;
+  const esc=s=>String(s==null?"":s).replace(/&/g,"&amp;").replace(/</g,"&lt;");
   const days=Object.entries(c.days).sort((a,b)=>a[0].localeCompare(b[0]));
+  const first=days.length?days[0][0]:"—", last=days.length?days[days.length-1][0]:"—";
+  const totReach=c.reach, totImpr=c.impressions, clicks=c.clicks, spend=c.spend;
+  const cpm=totImpr?spend/totImpr*1000:0, ctr=totImpr?clicks/totImpr:0;
   const rows=days.map(([dt,v])=>{
-    const cpm=v.impr?v.spend/v.impr*1000:0, ctr=v.impr?v.clicks/v.impr:0, cpc=v.clicks?v.spend/v.clicks:0;
-    return `<tr><td class="camp">${dt}</td><td>${fmtMoney(v.spend)}</td><td>${fmtInt(v.impr)}</td><td>${fmtInt(v.reach)}</td><td>${fmtPct(ctr)}</td><td>฿${cpm.toFixed(1)}</td><td>฿${cpc.toFixed(2)}</td></tr>`;
+    const dcpm=v.impr?v.spend/v.impr*1000:0, dctr=v.impr?v.clicks/v.impr:0, dcpc=v.clicks?v.spend/v.clicks:0;
+    return `<tr><td class="camp">${dt}</td><td>${fmtMoney(v.spend)}</td><td>${fmtInt(v.impr)}</td><td>${fmtInt(v.reach)}</td><td>${fmtPct(dctr)}</td><td>฿${dcpm.toFixed(1)}</td><td>฿${dcpc.toFixed(2)}</td></tr>`;
   }).join("");
+  const stat=(v,l,na)=>`<div class="pp-stat${na?' na':''}"><b>${na?'—':v}</b><span>${l}</span></div>`;
+  const img=c.thumb
+    ? `<img class="pp-img" src="${c.thumb}" alt="" onerror="this.className='pp-img ph';this.removeAttribute('src');this.textContent='🖼';">`
+    : `<div class="pp-img ph">🖼</div>`;
   det.innerHTML=`
     <div class="cre-detail">
-      <div style="display:flex;justify-content:space-between;align-items:center;gap:12px;margin-bottom:10px">
-        <h3 style="font-size:15px">📊 ${c.ad}</h3>
-        <span style="color:var(--muted);font-size:12px;white-space:nowrap">${c.adset} · ${days.length} วัน</span>
+      <div class="post-perf">
+        <div class="pp-left">
+          <div class="pp-page">${esc(bidAccount==="__all__"?(bidCampaign||c.adset):bidAccount)}</div>
+          <div class="pp-msg">${esc(c.ad)}</div>
+          ${img}
+        </div>
+        <div class="pp-right">
+          <h3>Performance for your post</h3>
+          <div class="pp-meta">
+            <div class="k">Page name:</div><div class="v">${esc(bidAccount==="__all__"?"—":bidAccount)}</div>
+            <div class="k">Campaign:</div><div class="v">${esc(bidCampaign||"—")}</div>
+            <div class="k">Ad / Creative:</div><div class="v">${esc(c.ad)}</div>
+            <div class="k">Type:</div><div class="v">${c.thumb?"Photo":"—"}</div>
+            <div class="k">Date range:</div><div class="v">${first} → ${last} · ${days.length} วัน</div>
+          </div>
+
+          <div class="pp-sec">Reach &amp; Impressions</div>
+          <div class="pp-box">
+            ${stat(fmtInt(totReach),"Lifetime Post Total reach")}
+            ${stat("","Lifetime Post Organic reach",true)}
+            ${stat(fmtInt(totReach),"Lifetime Post Paid reach")}
+            ${stat(fmtInt(totImpr),"Lifetime Post Total impression")}
+            ${stat("","Lifetime Post Organic impression",true)}
+            ${stat(fmtInt(totImpr),"Lifetime Post Paid impression")}
+          </div>
+
+          <div class="pp-sec">Reactions</div>
+          <div class="pp-box">
+            ${["Like","Love","Haha","Wow","Sad","Angry"].map(r=>stat("",r,true)).join("")}
+          </div>
+          <div class="pp-note">Reactions / Organic-Paid split / Share / Comment มาจาก Page Insights ซึ่ง Windsor (ads connector) ไม่ได้ส่งมา — จึงแสดง —</div>
+
+          <div class="pp-sec">Share Comments and Post Click</div>
+          <div class="pp-box">
+            ${stat("","Share",true)}
+            ${stat("","Comment",true)}
+            ${stat(fmtInt(clicks),"Post Click (clicks)")}
+          </div>
+
+          <div class="pp-sec">Cost</div>
+          <div class="pp-box">
+            ${stat(fmtMoney(spend),"Spend")}
+            ${stat("฿"+cpm.toFixed(2),"CPM")}
+            ${stat(fmtPct(ctr),"CTR")}
+          </div>
+        </div>
       </div>
-      <div style="overflow-x:auto">
-        <table><thead><tr>
-          <th>วันที่</th><th>Spend</th><th>Impr.</th><th>Reach</th><th>CTR</th><th>CPM</th><th>CPC</th>
-        </tr></thead><tbody>${rows}</tbody></table>
+
+      <div style="margin-top:6px">
+        <div class="pp-sec">รายวัน (Daily)</div>
+        <div style="overflow-x:auto">
+          <table><thead><tr>
+            <th>วันที่</th><th>Spend</th><th>Impr.</th><th>Reach</th><th>CTR</th><th>CPM</th><th>CPC</th>
+          </tr></thead><tbody>${rows}</tbody></table>
+        </div>
       </div>
     </div>`;
   det.scrollIntoView({behavior:"smooth",block:"nearest"});
