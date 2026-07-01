@@ -313,9 +313,13 @@
 // เปิดไฟล์ตรงๆ (file://) → ดึง Windsor ตรง ใช้ key จาก localStorage
 const USE_PROXY = location.protocol === "http:" || location.protocol === "https:";
 const ENDPOINT = USE_PROXY ? "/api/windsor" : "https://connectors.windsor.ai/all";
-function wfetch(params){
-  if(USE_PROXY) return fetch(`${ENDPOINT}?${params}`, {headers: API_KEY ? {"x-windsor-key":API_KEY} : {}});
-  return fetch(`${ENDPOINT}?api_key=${API_KEY}&${params}`);
+function wfetch(params, connector){
+  if(USE_PROXY){
+    const p = connector ? `connector=${connector}&${params}` : params;
+    return fetch(`${ENDPOINT}?${p}`, {headers: API_KEY ? {"x-windsor-key":API_KEY} : {}});
+  }
+  const base = connector ? `https://connectors.windsor.ai/${connector}` : ENDPOINT;
+  return fetch(`${base}?api_key=${API_KEY}&${params}`);
 }
 const FIELDS = "source,account_name,account_id,campaign,campaign_status,objective,clicks,spend,impressions,reach,date";
 const PREV_FIELDS = "source,account_name,spend,impressions,reach,clicks";
@@ -324,6 +328,13 @@ const BID_BASE = "source,account_name,account_id,campaign,adset_name,ad_name,spe
 const BID_OPT_TIERS = ["thumbnail_url,permalink_url","thumbnail_url,object_story_id","thumbnail_url",""];
 // object_story_id = "{pageid}_{postid}" → แปลงเป็น URL โพสต์จริง
 function storyToUrl(s){ if(!s) return ""; s=String(s); if(/^https?:/i.test(s)) return s; const p=s.split("_"); return p.length>=2 ? `https://www.facebook.com/${p[0]}/posts/${p[1]}` : ""; }
+// Facebook Page Insights (connector=facebook_organic) — ข้อมูลโพสต์จริง: permalink, reactions, organic/paid
+// ไล่ระดับ: ครบสุด → เหลือแค่ permalink+message (ชุดเล็กสุดมักผ่านเสมอ ทำให้ได้ลิงก์แน่นอน)
+const ORG_TIERS = [
+  "date,post_id,permalink_url,message,post_impressions,post_impressions_organic,post_impressions_paid,post_impressions_unique,post_impressions_organic_unique,post_impressions_paid_unique,post_reactions_like_total,post_reactions_love_total,post_reactions_haha_total,post_reactions_wow_total,post_reactions_sorry_total,post_reactions_anger_total,post_clicks",
+  "date,post_id,permalink_url,message,post_impressions,post_impressions_unique,post_impressions_organic_unique,post_impressions_paid_unique",
+  "post_id,permalink_url,message"
+];
 const KEY_STORE = "windsor_api_key";
 let API_KEY = localStorage.getItem(KEY_STORE) || "";
 
@@ -650,6 +661,49 @@ function sortBy(k){ if(sortKey===k) sortDir*=-1; else {sortKey=k; sortDir=-1;} r
 /* ---------------- BIDDABLE — creative monitor (เจาะบัญชี + แคมเปญ) ---------------- */
 let bidRaw=[], bidAccount="__all__", bidCampaign="", bidPreset="last_30d", bidLoaded=false, bidChart=null, bidNoImg=false, bidAuto=true;
 let bidCreatives=[], bidSel=-1;
+let orgPosts=[], orgTier=-1;   // โพสต์จาก facebook_organic (Page Insights)
+
+// ดึงข้อมูลโพสต์จริงจาก Page Insights (permalink + reactions + organic/paid) — ไม่บล็อกจอหลัก
+async function loadOrganic(){
+  orgPosts=[]; orgTier=-1;
+  for(let i=0;i<ORG_TIERS.length;i++){
+    try{
+      const res=await wfetch(`date_preset=${bidPreset}&fields=${ORG_TIERS[i]}`, "facebook_organic");
+      if(!res.ok) continue;
+      const rows=(await res.json()).data||[];
+      const m={};
+      rows.forEach(r=>{
+        const id=r.post_id||r.permalink_url||r.message; if(!id) return;
+        if(!m[id]) m[id]={id, permalink:r.permalink_url||"", message:r.message||"",
+          impr:0, imprOrg:0, imprPaid:0, reach:0, reachOrg:0, reachPaid:0,
+          like:0, love:0, haha:0, wow:0, sad:0, angry:0, clicks:0};
+        const p=m[id];
+        // lifetime metric = ค่าสะสม → ใช้ max ของแต่ละวันแทนยอดรวม
+        const mx=(k,v)=>{ p[k]=Math.max(p[k], +v||0); };
+        mx("impr",r.post_impressions); mx("imprOrg",r.post_impressions_organic); mx("imprPaid",r.post_impressions_paid);
+        mx("reach",r.post_impressions_unique); mx("reachOrg",r.post_impressions_organic_unique); mx("reachPaid",r.post_impressions_paid_unique);
+        mx("like",r.post_reactions_like_total); mx("love",r.post_reactions_love_total); mx("haha",r.post_reactions_haha_total);
+        mx("wow",r.post_reactions_wow_total); mx("sad",r.post_reactions_sorry_total); mx("angry",r.post_reactions_anger_total);
+        mx("clicks",r.post_clicks);
+        if(!p.permalink && r.permalink_url) p.permalink=r.permalink_url;
+        if(!p.message && r.message) p.message=r.message;
+      });
+      orgPosts=Object.values(m); orgTier=i; break;
+    }catch(e){ /* ลองชุดถัดไป */ }
+  }
+  // ถ้ากำลังเปิดรายละเอียด creative อยู่ ให้ render ใหม่ให้ข้อมูลโพสต์เข้าไปเติม
+  if(bidSel>=0) selectCreative(bidSel);
+}
+
+// จับคู่ creative (ad) กับโพสต์จริง โดยเทียบข้อความ
+function matchOrgPost(c){
+  if(!orgPosts.length) return null;
+  const norm=s=>String(s||"").replace(/\s+/g,"").toLowerCase();
+  const ad=norm(c.ad);
+  if(ad.length<4) return null;
+  const key=ad.slice(0,30);
+  return orgPosts.find(p=>{ const msg=norm(p.message); return msg && (msg.includes(key)||ad.includes(msg.slice(0,30))); }) || null;
+}
 const fmtK = n => n>=1000 ? (n/1000).toFixed(n>=10000?0:1)+"K" : fmtInt(n);
 
 function showBiddable(){
@@ -688,6 +742,7 @@ async function loadBiddable(){
     renderBidAccountFilter();
     renderBidCampaigns();
     renderBiddable();
+    loadOrganic();   // เติมข้อมูลโพสต์จริง (permalink/reactions) แบบเบื้องหลัง
   }catch(e){
     document.getElementById("bidContent").innerHTML=`<div class="error">❌ ดึงข้อมูลไม่สำเร็จ: ${e.message}</div>`;
   }
@@ -803,26 +858,33 @@ function selectCreative(i){
     const dcpm=v.impr?v.spend/v.impr*1000:0, dctr=v.impr?v.clicks/v.impr:0, dcpc=v.clicks?v.spend/v.clicks:0;
     return `<tr><td class="camp">${dt}</td><td>${fmtMoney(v.spend)}</td><td>${fmtInt(v.impr)}</td><td>${fmtInt(v.reach)}</td><td>${fmtPct(dctr)}</td><td>฿${dcpm.toFixed(1)}</td><td>฿${dcpc.toFixed(2)}</td></tr>`;
   }).join("");
+  const post=matchOrgPost(c);
+  const link=(post&&post.permalink)||c.link||"";
   const stat=(v,l,na)=>`<div class="pp-stat${na?' na':''}"><b>${na?'—':v}</b><span>${l}</span></div>`;
+  const num=v=>fmtInt(v);
   const imgTag=c.thumb
     ? `<img class="pp-img" src="${c.thumb}" alt="" onerror="this.className='pp-img ph';this.removeAttribute('src');this.textContent='🖼';">`
     : `<div class="pp-img ph">🖼</div>`;
-  const img=c.link
-    ? `<a href="${c.link}" target="_blank" rel="noopener" title="เปิดโพสต์จริงบน Facebook">${imgTag}</a>`
+  const img=link
+    ? `<a href="${link}" target="_blank" rel="noopener" title="เปิดโพสต์จริงบน Facebook">${imgTag}</a>`
     : imgTag;
+  // ถ้า match โพสต์ organic ได้ → ใช้ค่าจริง (organic/paid split); ไม่งั้น fallback เป็นค่า ads (paid≈total)
+  const R = post
+    ? {tr:post.reach||totReach, or:post.reachOrg, pr:post.reachPaid||totReach, ti:post.impr||totImpr, oi:post.imprOrg, pi:post.imprPaid||totImpr}
+    : {tr:totReach, or:null, pr:totReach, ti:totImpr, oi:null, pi:totImpr};
   det.innerHTML=`
     <div class="cre-detail">
       <div class="post-perf">
         <div class="pp-left">
           <div class="pp-page">${esc(bidAccount==="__all__"?(bidCampaign||c.adset):bidAccount)}</div>
-          <div class="pp-msg">${esc(c.ad)}</div>
+          <div class="pp-msg">${esc((post&&post.message)||c.ad)}</div>
           ${img}
         </div>
         <div class="pp-right">
           <h3>Performance for your post</h3>
           <div class="pp-meta">
             <div class="k">Page name:</div><div class="v">${esc(bidAccount==="__all__"?"—":bidAccount)}</div>
-            <div class="k">Link Post:</div><div class="v">${c.link?`<a href="${c.link}" target="_blank" rel="noopener">${esc(c.link)}</a>`:"—"}</div>
+            <div class="k">Link Post:</div><div class="v">${link?`<a href="${link}" target="_blank" rel="noopener">${esc(link)}</a>`:"—"}</div>
             <div class="k">Campaign:</div><div class="v">${esc(bidCampaign||"—")}</div>
             <div class="k">Ad / Creative:</div><div class="v">${esc(c.ad)}</div>
             <div class="k">Type:</div><div class="v">${c.thumb?"Photo":"—"}</div>
@@ -831,25 +893,32 @@ function selectCreative(i){
 
           <div class="pp-sec">Reach &amp; Impressions</div>
           <div class="pp-box">
-            ${stat(fmtInt(totReach),"Lifetime Post Total reach")}
-            ${stat("","Lifetime Post Organic reach",true)}
-            ${stat(fmtInt(totReach),"Lifetime Post Paid reach")}
-            ${stat(fmtInt(totImpr),"Lifetime Post Total impression")}
-            ${stat("","Lifetime Post Organic impression",true)}
-            ${stat(fmtInt(totImpr),"Lifetime Post Paid impression")}
+            ${stat(num(R.tr),"Lifetime Post Total reach")}
+            ${stat(R.or==null?"":num(R.or),"Lifetime Post Organic reach",R.or==null)}
+            ${stat(num(R.pr),"Lifetime Post Paid reach")}
+            ${stat(num(R.ti),"Lifetime Post Total impression")}
+            ${stat(R.oi==null?"":num(R.oi),"Lifetime Post Organic impression",R.oi==null)}
+            ${stat(num(R.pi),"Lifetime Post Paid impression")}
           </div>
 
           <div class="pp-sec">Reactions</div>
           <div class="pp-box">
-            ${["Like","Love","Haha","Wow","Sad","Angry"].map(r=>stat("",r,true)).join("")}
+            ${stat(post?num(post.like):"","Like",!post)}
+            ${stat(post?num(post.love):"","Love",!post)}
+            ${stat(post?num(post.haha):"","Haha",!post)}
+            ${stat(post?num(post.wow):"","Wow",!post)}
+            ${stat(post?num(post.sad):"","Sad",!post)}
+            ${stat(post?num(post.angry):"","Angry",!post)}
           </div>
-          <div class="pp-note">Reactions / Organic-Paid split / Share / Comment มาจาก Page Insights ซึ่ง Windsor (ads connector) ไม่ได้ส่งมา — จึงแสดง —</div>
+          ${post
+            ? `<div class="pp-note">✓ จับคู่โพสต์จริงจาก Page Insights (facebook_organic) แล้ว · Share/Comment ยังไม่ได้ดึง</div>`
+            : `<div class="pp-note">ยังจับคู่โพสต์จริงไม่ได้ — ${orgPosts.length?"มี "+orgPosts.length+" โพสต์จาก Page Insights แต่ข้อความไม่ตรงกับ ad นี้":"Page Insights (facebook_organic) ยังไม่มีข้อมูล/connector ไม่ส่งมา"} · Paid reach/impression ใช้ค่า ads แทน</div>`}
 
           <div class="pp-sec">Share Comments and Post Click</div>
           <div class="pp-box">
             ${stat("","Share",true)}
             ${stat("","Comment",true)}
-            ${stat(fmtInt(clicks),"Post Click (clicks)")}
+            ${stat(num(post&&post.clicks?post.clicks:clicks),"Post Click")}
           </div>
 
           <div class="pp-sec">Cost</div>
