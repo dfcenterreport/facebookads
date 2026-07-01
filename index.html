@@ -692,18 +692,37 @@ async function loadOrganic(){
       orgPosts=Object.values(m); orgTier=i; break;
     }catch(e){ /* ลองชุดถัดไป */ }
   }
+  computeOrgMatches();
   // ถ้ากำลังเปิดรายละเอียด creative อยู่ ให้ render ใหม่ให้ข้อมูลโพสต์เข้าไปเติม
   if(bidSel>=0) selectCreative(bidSel);
 }
 
-// จับคู่ creative (ad) กับโพสต์จริง ด้วย post id (object_story_id ↔ post_id)
-// รูปแบบ id = "{pageid}_{postid}" → เทียบเฉพาะส่วน postid ท้ายสุด (page id อาจต่างกัน)
+// ---- จับคู่ creative (ad) ↔ โพสต์จริง (organic) ----
+// id = "{pageid}_{postid}" → เทียบส่วน postid ท้ายสุด (page id อาจต่างกัน)
 const postSuffix=s=>{ const p=String(s||"").split("_"); return p.length>=2?p[p.length-1]:(String(s||"").match(/(\d{6,})\/?$/)||[])[1]||""; };
-function matchOrgPost(c){
-  if(!orgPosts.length || !c.storyId) return null;
-  const cs=postSuffix(c.storyId); if(!cs) return null;
-  return orgPosts.find(p=>postSuffix(p.id)===cs) || null;
+let orgMatch={};   // key = ad||adset → org post
+const creKey=c=>c.ad+"||"+c.adset;
+function computeOrgMatches(){
+  orgMatch={};
+  if(!orgPosts.length || !bidCreatives.length) return;
+  const avail=orgPosts.slice();
+  const take=(c,p,by)=>{ p._by=by; orgMatch[creKey(c)]=p; const i=avail.indexOf(p); if(i>=0) avail.splice(i,1); };
+  // 1) จับคู่แบบแม่นด้วย post id (ถ้าฝั่ง ads ส่ง object_story_id มา)
+  bidCreatives.forEach(c=>{
+    const cs=postSuffix(c.storyId); if(!cs) return;
+    const hit=avail.find(p=>postSuffix(p.id)===cs);
+    if(hit) take(c,hit,"id");
+  });
+  // 2) ที่เหลือ: จับคู่ด้วยยอด paid impressions ใกล้สุด (greedy จาก spend มากไปน้อย)
+  bidCreatives.filter(c=>!orgMatch[creKey(c)]).sort((a,b)=>b.spend-a.spend).forEach(c=>{
+    const base=c.impressions||c.reach||0; if(!base) return;
+    let best=null, bestDiff=1;
+    avail.forEach(p=>{ const pv=p.imprPaid||p.impr||p.reach||0; if(!pv) return;
+      const d=Math.abs(base-pv)/Math.max(base,pv); if(d<bestDiff){ bestDiff=d; best=p; } });
+    if(best && bestDiff<=0.30) take(c,best,"≈");
+  });
 }
+function matchOrgPost(c){ return orgMatch[creKey(c)]||null; }
 const fmtK = n => n>=1000 ? (n/1000).toFixed(n>=10000?0:1)+"K" : fmtInt(n);
 
 function showBiddable(){
@@ -785,6 +804,7 @@ function renderBiddable(){
   const kpi=(l,v)=>`<div class="kpi"><div class="klabel">${l}</div><div class="kval">${v}</div></div>`;
 
   bidCreatives = buildCreatives(data);
+  computeOrgMatches();
   const creBlock = bidCampaign
     ? (bidCreatives.length
         ? `<div class="cre-grid">${bidCreatives.map((c,i)=>creCard(c,i)).join("")}</div><div id="creDetail"></div>`
@@ -913,8 +933,8 @@ function selectCreative(i){
             ${stat(post?num(post.angry):"","Angry",!post)}
           </div>
           ${post
-            ? `<div class="pp-note">✓ จับคู่โพสต์จริงจาก Page Insights (facebook_organic) แล้ว · Share/Comment ยังไม่ได้ดึง</div>`
-            : `<div class="pp-note">ยังจับคู่โพสต์จริงไม่ได้ — ${orgPosts.length?"มี "+orgPosts.length+" โพสต์จาก Page Insights แต่ข้อความไม่ตรงกับ ad นี้":"Page Insights (facebook_organic) ยังไม่มีข้อมูล/connector ไม่ส่งมา"} · Paid reach/impression ใช้ค่า ads แทน</div>`}
+            ? `<div class="pp-note">✓ จับคู่โพสต์จริงจาก Page Insights ${post._by==="id"?"(ตรงด้วย post id)":"(ประมาณจากยอด impressions ที่ใกล้สุด)"} · Share/Comment ยังไม่ได้ดึง</div>`
+            : `<div class="pp-note">ยังจับคู่โพสต์จริงไม่ได้ — ${orgPosts.length?"มี "+orgPosts.length+" โพสต์ organic แต่ยอด/ID ไม่ใกล้พอกับ ad นี้":"Page Insights (facebook_organic) ยังไม่มีข้อมูล"} · reach/impression ใช้ค่า ads แทน</div>`}
 
           <div class="pp-sec">Share Comments and Post Click</div>
           <div class="pp-box">
