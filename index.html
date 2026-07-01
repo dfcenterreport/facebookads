@@ -971,15 +971,22 @@ document.getElementById("bidDebug").onclick=async()=>{
   const out=document.getElementById("bidContent");
   out.insertAdjacentHTML("afterbegin",'<div id="dbg" class="panel" style="margin-bottom:16px">⏳ กำลังตรวจ facebook_organic…</div>');
   const box=document.getElementById("dbg");
-  const tries=[["min (post_id,permalink_url,message)","post_id,permalink_url,message"],["date only","date"],["rich (tier0)",ORG_TIERS[0]]];
-  let html='<b>🔧 facebook_organic debug</b> <button onclick="this.closest(\'#dbg\').remove()" style="float:right">ปิด</button>';
-  const sids=(bidCreatives||[]).map(c=>`${c.ad} → object_story_id="${c.storyId||"(ว่าง)"}"`).join("<br>");
-  html+=`<div style="margin-top:10px"><b>ads object_story_id (join key)</b><pre style="white-space:pre-wrap;font-size:11px;max-height:140px;overflow:auto;background:var(--well);padding:8px;border-radius:4px;margin-top:4px">${(sids||"(ยังไม่มี creatives — เลือกแคมเปญก่อน)").replace(/</g,"&lt;")}</pre></div>`;
-  for(const [name,f] of tries){
+  // ทดสอบว่าฝั่ง ads คืน field ไหนได้บ้าง (หา join key) + organic min
+  const tries=[
+    ["ADS object_story_id","source,campaign,ad_name,object_story_id",""],
+    ["ADS effective_object_story_id","source,campaign,ad_name,effective_object_story_id",""],
+    ["ADS instagram_permalink_url","source,campaign,ad_name,instagram_permalink_url",""],
+    ["ADS post_id","source,campaign,ad_name,post_id",""],
+    ["ORGANIC min","post_id,permalink_url,message","facebook_organic"]
+  ];
+  let html='<b>🔧 debug</b> <button onclick="this.closest(\'#dbg\').remove()" style="float:right">ปิด</button>';
+  const sids=(bidCreatives||[]).map(c=>`${c.ad} → storyId="${c.storyId||"(ว่าง)"}"`).join("<br>");
+  html+=`<div style="margin-top:10px"><b>creatives ปัจจุบัน (join key)</b><pre style="white-space:pre-wrap;font-size:11px;max-height:120px;overflow:auto;background:var(--well);padding:8px;border-radius:4px;margin-top:4px">${(sids||"(เลือกแคมเปญก่อน)").replace(/</g,"&lt;")}</pre></div>`;
+  for(const [name,f,conn] of tries){
     try{
-      const res=await wfetch(`date_preset=${bidPreset}&fields=${f}`,"facebook_organic");
+      const res=await wfetch(`date_preset=${bidPreset}&fields=${f}`, conn||undefined);
       const txt=await res.text();
-      html+=`<div style="margin-top:10px"><b>${name}</b> → HTTP ${res.status}<pre style="white-space:pre-wrap;font-size:11px;max-height:200px;overflow:auto;background:var(--well);padding:8px;border-radius:4px;margin-top:4px">${txt.slice(0,1500).replace(/&/g,"&amp;").replace(/</g,"&lt;")}</pre></div>`;
+      html+=`<div style="margin-top:10px"><b>${name}</b> → HTTP ${res.status}<pre style="white-space:pre-wrap;font-size:11px;max-height:180px;overflow:auto;background:var(--well);padding:8px;border-radius:4px;margin-top:4px">${txt.slice(0,1200).replace(/&/g,"&amp;").replace(/</g,"&lt;")}</pre></div>`;
     }catch(e){ html+=`<div style="margin-top:10px"><b>${name}</b> → ERROR ${e.message}</div>`; }
   }
   box.innerHTML=html;
