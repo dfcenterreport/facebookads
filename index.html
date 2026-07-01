@@ -126,6 +126,7 @@
   <div class="topnav-tabs">
     <div class="topnav-tab active" data-view="app">Dashboard</div>
     <div class="topnav-tab" data-view="biddable">Biddable</div>
+    <div class="topnav-tab" data-view="activeacct">Active Ad account</div>
   </div>
 </nav>
 
@@ -183,6 +184,13 @@
 <!-- ===================== BIDDABLE (empty) ===================== -->
 <section id="biddableView" style="display:none">
   <p style="text-align:center;font-weight:700;padding:10px 0">hello Biddble</p>
+</section>
+
+<!-- ===================== ACTIVE AD ACCOUNT ===================== -->
+<section id="activeacctView" style="display:none">
+  <h1 style="margin-bottom:6px">Active Ad account</h1>
+  <div class="sub" style="margin-bottom:22px">สถานะบัญชีโฆษณาทั้งหมด (Active / Inactive)</div>
+  <div id="activeAcctContent"><div class="loading">กำลังดึงข้อมูลจาก Windsor…</div></div>
 </section>
 
 <script>
@@ -412,6 +420,44 @@ function render(){
   drawTable(data);
 }
 
+/* ---------------- ACTIVE AD ACCOUNT ---------------- */
+let activeAcctData = [];
+async function loadActiveAccounts(){
+  if(!ensureKey(false)){
+    document.getElementById("activeAcctContent").innerHTML='<div class="error">ยังไม่มี API key — กดปุ่ม “🔑 Key”</div>'; return;
+  }
+  document.getElementById("activeAcctContent").innerHTML='<div class="loading">กำลังดึงข้อมูลจาก Windsor…</div>';
+  try{
+    const res = await wfetch(`date_preset=last_7d&fields=account_name,campaign_status,spend`);
+    if(!res.ok) throw new Error("HTTP "+res.status);
+    const rows=(await res.json()).data||[];
+    const map={};
+    rows.forEach(r=>{
+      const a=acctOf(r);
+      if(!map[a]) map[a]={name:a,active:false,spend:0};
+      if((r.campaign_status||"").toUpperCase()==="ACTIVE") map[a].active=true;
+      map[a].spend+=+r.spend||0;
+    });
+    activeAcctData=Object.values(map).sort((a,b)=>b.spend-a.spend);
+    renderActiveAccounts();
+  }catch(e){
+    document.getElementById("activeAcctContent").innerHTML=`<div class="error">❌ โหลดข้อมูลไม่สำเร็จ: ${e.message}</div>`;
+  }
+}
+
+function renderActiveAccounts(){
+  const rows=activeAcctData.map(a=>`
+    <div class="acct-row">
+      <div class="acct-ico">${a.active?'🟢':'⚪'}</div>
+      <div class="acct-info">
+        <div class="acct-name">${a.name}</div>
+        <div class="acct-id">${a.active?'<span class="tag active">ACTIVE</span>':'<span class="tag paused">INACTIVE</span>'}</div>
+      </div>
+      <div class="acct-meta"><div class="spend">${fmtMoney(a.spend)}</div><div class="cap">Spend 7 วัน</div></div>
+    </div>`).join("");
+  document.getElementById("activeAcctContent").innerHTML = rows || '<div class="loading">ไม่มีข้อมูล Ad Account</div>';
+}
+
 const th=(k,l)=>`<th onclick="sortBy('${k}')">${l}${sortKey===k?(sortDir<0?' ▾':' ▴'):''}</th>`;
 
 function drawTrend(data,dates){
@@ -502,19 +548,22 @@ document.getElementById("keyBtn").onclick=()=>{ if(ensureKey(true)) load(); };
 document.getElementById("keyBtnLanding").onclick=()=>{ if(ensureKey(true)){ landingAccts=[]; loadAccounts(); } };
 document.getElementById("backBtn").onclick=showLanding;
 
-let viewBeforeBiddable="landing";
+const SIDE_VIEWS=["biddable","activeacct"];
+let viewBeforeSide="landing";
 document.getElementById("topNav").onclick=e=>{
   const t=e.target.closest(".topnav-tab"); if(!t) return;
   document.querySelectorAll(".topnav-tab").forEach(x=>x.classList.remove("active"));
   t.classList.add("active");
-  if(t.dataset.view==="biddable"){
-    viewBeforeBiddable = document.getElementById("dashboardView").style.display!=="none" ? "dashboard" : "landing";
+  const view=t.dataset.view;
+  if(SIDE_VIEWS.includes(view)){
+    viewBeforeSide = document.getElementById("dashboardView").style.display!=="none" ? "dashboard" : "landing";
     document.getElementById("landingView").style.display="none";
     document.getElementById("dashboardView").style.display="none";
-    document.getElementById("biddableView").style.display="block";
+    SIDE_VIEWS.forEach(v=>document.getElementById(v+"View").style.display = v===view?"block":"none");
+    if(view==="activeacct" && !activeAcctData.length) loadActiveAccounts();
   }else{
-    document.getElementById("biddableView").style.display="none";
-    if(viewBeforeBiddable==="dashboard") document.getElementById("dashboardView").style.display="block";
+    SIDE_VIEWS.forEach(v=>document.getElementById(v+"View").style.display="none");
+    if(viewBeforeSide==="dashboard") document.getElementById("dashboardView").style.display="block";
     else showLanding();
   }
 };
