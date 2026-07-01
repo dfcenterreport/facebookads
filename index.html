@@ -319,8 +319,11 @@ function wfetch(params){
 }
 const FIELDS = "source,account_name,account_id,campaign,campaign_status,objective,clicks,spend,impressions,reach,date";
 const PREV_FIELDS = "source,account_name,spend,impressions,reach,clicks";
-const BID_FIELDS = "source,account_name,account_id,campaign,adset_name,ad_name,thumbnail_url,spend,impressions,reach,clicks,date";
-const BID_FIELDS_NOIMG = "source,account_name,account_id,campaign,adset_name,ad_name,spend,impressions,reach,clicks,date";
+const BID_BASE = "source,account_name,account_id,campaign,adset_name,ad_name,spend,impressions,reach,clicks,date";
+// ไล่ระดับ field เสริม (thumbnail + ลิงก์โพสต์) — ลองชุดครบสุดก่อน ถ้า connector ไม่รองรับค่อยถอย
+const BID_OPT_TIERS = ["thumbnail_url,permalink_url","thumbnail_url,object_story_id","thumbnail_url",""];
+// object_story_id = "{pageid}_{postid}" → แปลงเป็น URL โพสต์จริง
+function storyToUrl(s){ if(!s) return ""; s=String(s); if(/^https?:/i.test(s)) return s; const p=s.split("_"); return p.length>=2 ? `https://www.facebook.com/${p[0]}/posts/${p[1]}` : ""; }
 const KEY_STORE = "windsor_api_key";
 let API_KEY = localStorage.getItem(KEY_STORE) || "";
 
@@ -662,13 +665,18 @@ async function loadBiddable(){
   }
   document.getElementById("bidContent").innerHTML='<div class="loading">กำลังดึงข้อมูลจาก Windsor…</div>';
   try{
-    let res=await wfetch(`date_preset=${bidPreset}&fields=${BID_FIELDS}`);
-    if(!res.ok){ bidNoImg=true; res=await wfetch(`date_preset=${bidPreset}&fields=${BID_FIELDS_NOIMG}`); if(!res.ok) throw new Error("HTTP "+res.status); }
-    else bidNoImg=false;
-    bidRaw=((await res.json()).data||[]).map(r=>({
+    let data=null, opt="";
+    for(const o of BID_OPT_TIERS){
+      const f=BID_BASE+(o?","+o:"");
+      const res=await wfetch(`date_preset=${bidPreset}&fields=${f}`);
+      if(res.ok){ data=(await res.json()).data||[]; opt=o; break; }
+    }
+    if(data===null) throw new Error("Windsor ปฏิเสธทุกชุด field");
+    bidNoImg = !/thumbnail_url/.test(opt);
+    bidRaw=data.map(r=>({
       account:acctOf(r), campaign:r.campaign||"(ไม่ระบุแคมเปญ)",
       adset:r.adset_name||"(ไม่ระบุ adset)", ad:r.ad_name||"(ไม่ระบุ ad)",
-      thumb:r.thumbnail_url||"", date:r.date,
+      thumb:r.thumbnail_url||"", link:r.permalink_url||storyToUrl(r.object_story_id), date:r.date,
       spend:+r.spend||0, impressions:+r.impressions||0, reach:+r.reach||0, clicks:+r.clicks||0
     }));
     bidLoaded=true;
@@ -752,9 +760,10 @@ function buildCreatives(data){
   const m={};
   data.forEach(r=>{
     const k=r.ad+"||"+r.adset;
-    if(!m[k]) m[k]={ad:r.ad,adset:r.adset,thumb:"",spend:0,impressions:0,reach:0,clicks:0,days:{}};
+    if(!m[k]) m[k]={ad:r.ad,adset:r.adset,thumb:"",link:"",spend:0,impressions:0,reach:0,clicks:0,days:{}};
     const c=m[k]; c.spend+=r.spend;c.impressions+=r.impressions;c.reach+=r.reach;c.clicks+=r.clicks;
     if(!c.thumb && r.thumb) c.thumb=r.thumb;
+    if(!c.link && r.link) c.link=r.link;
     if(!c.days[r.date]) c.days[r.date]={spend:0,impr:0,reach:0,clicks:0};
     const d=c.days[r.date]; d.spend+=r.spend;d.impr+=r.impressions;d.reach+=r.reach;d.clicks+=r.clicks;
   });
@@ -795,9 +804,12 @@ function selectCreative(i){
     return `<tr><td class="camp">${dt}</td><td>${fmtMoney(v.spend)}</td><td>${fmtInt(v.impr)}</td><td>${fmtInt(v.reach)}</td><td>${fmtPct(dctr)}</td><td>฿${dcpm.toFixed(1)}</td><td>฿${dcpc.toFixed(2)}</td></tr>`;
   }).join("");
   const stat=(v,l,na)=>`<div class="pp-stat${na?' na':''}"><b>${na?'—':v}</b><span>${l}</span></div>`;
-  const img=c.thumb
+  const imgTag=c.thumb
     ? `<img class="pp-img" src="${c.thumb}" alt="" onerror="this.className='pp-img ph';this.removeAttribute('src');this.textContent='🖼';">`
     : `<div class="pp-img ph">🖼</div>`;
+  const img=c.link
+    ? `<a href="${c.link}" target="_blank" rel="noopener" title="เปิดโพสต์จริงบน Facebook">${imgTag}</a>`
+    : imgTag;
   det.innerHTML=`
     <div class="cre-detail">
       <div class="post-perf">
@@ -810,6 +822,7 @@ function selectCreative(i){
           <h3>Performance for your post</h3>
           <div class="pp-meta">
             <div class="k">Page name:</div><div class="v">${esc(bidAccount==="__all__"?"—":bidAccount)}</div>
+            <div class="k">Link Post:</div><div class="v">${c.link?`<a href="${c.link}" target="_blank" rel="noopener">${esc(c.link)}</a>`:"—"}</div>
             <div class="k">Campaign:</div><div class="v">${esc(bidCampaign||"—")}</div>
             <div class="k">Ad / Creative:</div><div class="v">${esc(c.ad)}</div>
             <div class="k">Type:</div><div class="v">${c.thumb?"Photo":"—"}</div>
