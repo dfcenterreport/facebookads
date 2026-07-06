@@ -658,15 +658,38 @@ function drawMonthlyTrend(labels, values){
 
 function drawQuarterTrend(labels, values){
   if(acctQuarterChart) acctQuarterChart.destroy();
+  const diffs = values.map((v,i)=> (i===0 || !values[i-1]) ? null : (v-values[i-1])/values[i-1]*100);
+
+  const diffLabelPlugin = {
+    id:"diffLabels",
+    afterDatasetsDraw(chart){
+      const meta = chart.getDatasetMeta(0);
+      const ctx = chart.ctx;
+      ctx.save();
+      ctx.font = "600 11px 'JetBrains Mono', monospace";
+      ctx.textAlign = "center";
+      meta.data.forEach((bar,i)=>{
+        const d = diffs[i];
+        if(d===null) return;
+        const up = d>=0;
+        ctx.fillStyle = up ? "#16a34a" : "#ba1a1a";
+        ctx.fillText(`${up?"▲":"▼"} ${up?"+":"-"}${Math.abs(d).toFixed(1)}%`, bar.x, bar.y-8);
+      });
+      ctx.restore();
+    }
+  };
+
   acctQuarterChart = new Chart(document.getElementById("acctQuarterTrend"),{
     type:"bar",
     data:{labels, datasets:[{label:"Spend (฿)", data:values, backgroundColor:"#FDD205", borderRadius:4, maxBarThickness:56}]},
     options:{responsive:true,
+      layout:{padding:{top:24}},
       plugins:{legend:{display:false}},
       scales:{
         x:{ticks:{color:"#969A9E",font:{family:'JetBrains Mono',size:10}},grid:{display:false}},
         y:{ticks:{color:"#969A9E",font:{family:'JetBrains Mono',size:10}},grid:{color:"#E2E4E6"}}
-      }}
+      }},
+    plugins:[diffLabelPlugin]
   });
 
   document.getElementById("acctQuarterCards").innerHTML = labels.map((l,i)=>{
