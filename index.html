@@ -802,6 +802,21 @@ function sortBy(k){ if(sortKey===k) sortDir*=-1; else {sortKey=k; sortDir=-1;} r
 let bidRaw=[], bidAccount="__all__", bidCampaign="", bidPreset="last_30d", bidLoaded=false, bidChart=null, bidNoImg=false, bidAuto=true;
 let bidCreatives=[], bidSel=-1;
 let orgPosts=[], orgTier=-1;   // โพสต์จาก facebook_organic (Page Insights)
+let apifyCache={};             // url -> item | null(fail) | "loading"
+
+// ดึง engagement ของโพสต์จาก Apify (reactions/shares/comments) ผ่าน server proxy
+async function fetchApify(url){
+  if(!USE_PROXY) return null;   // เรียกได้เฉพาะผ่าน server (key อยู่ที่ server)
+  try{
+    const res=await fetch(`/api/apify?url=${encodeURIComponent(url)}`);
+    if(!res.ok) return null;
+    const j=await res.json();
+    const items=Array.isArray(j)?j:(j.items||j.data||[]);
+    return items[0]||null;
+  }catch(e){ return null; }
+}
+// อ่านค่าจาก item ของ Apify แบบเผื่อชื่อ field หลายแบบ
+const apGet=(it,keys)=>{ for(const k of keys){ if(it && it[k]!=null && it[k]!=="") return +it[k]||0; } return null; };
 
 // ดึงข้อมูลโพสต์จริงจาก Page Insights (permalink + reactions + organic/paid) — ไม่บล็อกจอหลัก
 async function loadOrganic(){
@@ -1026,6 +1041,30 @@ function selectCreative(i){
   const link=(post&&post.permalink)||c.link||"";
   const stat=(v,l,na)=>`<div class="pp-stat${na?' na':''}"><b>${na?'—':v}</b><span>${l}</span></div>`;
   const num=v=>fmtInt(v);
+  // Apify: ดึง reactions/shares/comments จากโพสต์จริง (ค้นด้วย link) — โหลดแล้ว re-render
+  if(link && apifyCache[link]===undefined){
+    apifyCache[link]="loading";
+    fetchApify(link).then(it=>{ apifyCache[link]=it; if(bidSel===i) selectCreative(i); });
+  }
+  const ap = (link && apifyCache[link] && apifyCache[link]!=="loading") ? apifyCache[link] : null;
+  const apLoading = link && apifyCache[link]==="loading";
+  // ค่าแต่ละช่อง: Apify → Windsor → —
+  const rv=(apKeys, winVal)=>{
+    if(apLoading) return {v:"…",na:false};
+    const a=apGet(ap, apKeys); if(a!=null) return {v:num(a),na:false};
+    if(winVal!=null) return {v:num(winVal),na:false};
+    return {v:"",na:true};
+  };
+  const RE={
+    like:  rv(["likes","reactionLikeCount","reactionsCount"], post?post.like:null),
+    love:  rv(["reactionLoveCount","loveCount"], post?post.love:null),
+    haha:  rv(["reactionHahaCount","hahaCount"], post?post.haha:null),
+    wow:   rv(["reactionWowCount","wowCount"], post?post.wow:null),
+    sad:   rv(["reactionSadCount","sadCount"], post?post.sad:null),
+    angry: rv(["reactionAngryCount","angryCount"], post?post.angry:null),
+    share: rv(["shares","shareCount","sharesCount"], null),
+    comment: rv(["comments","commentCount","commentsCount"], null),
+  };
   const imgTag=c.thumb
     ? `<img class="pp-img" src="${c.thumb}" alt="" onerror="this.className='pp-img ph';this.removeAttribute('src');this.textContent='🖼';">`
     : `<div class="pp-img ph">🖼</div>`;
@@ -1068,21 +1107,26 @@ function selectCreative(i){
 
           <div class="pp-sec">Reactions</div>
           <div class="pp-box">
-            ${stat(post?num(post.like):"","Like",!post)}
-            ${stat(post?num(post.love):"","Love",!post)}
-            ${stat(post?num(post.haha):"","Haha",!post)}
-            ${stat(post?num(post.wow):"","Wow",!post)}
-            ${stat(post?num(post.sad):"","Sad",!post)}
-            ${stat(post?num(post.angry):"","Angry",!post)}
+            ${stat(RE.like.v,"Like",RE.like.na)}
+            ${stat(RE.love.v,"Love",RE.love.na)}
+            ${stat(RE.haha.v,"Haha",RE.haha.na)}
+            ${stat(RE.wow.v,"Wow",RE.wow.na)}
+            ${stat(RE.sad.v,"Sad",RE.sad.na)}
+            ${stat(RE.angry.v,"Angry",RE.angry.na)}
           </div>
-          ${post
-            ? `<div class="pp-note">✓ จับคู่โพสต์จริงจาก Page Insights ${post._by==="id"?"(ตรงด้วย post id)":"(ประมาณจากยอด impressions ที่ใกล้สุด)"} · Share/Comment ยังไม่ได้ดึง</div>`
-            : `<div class="pp-note">ยังจับคู่โพสต์จริงไม่ได้ — ${orgPosts.length?"มี "+orgPosts.length+" โพสต์ organic แต่ยอด/ID ไม่ใกล้พอกับ ad นี้":"Page Insights (facebook_organic) ยังไม่มีข้อมูล"} · reach/impression ใช้ค่า ads แทน</div>`}
+          <div class="pp-note">${
+            apLoading ? "⏳ กำลังดึง reactions / share / comment จาก Apify…"
+            : ap ? "✓ reactions / share / comment จาก Apify · reach/impression จาก Page Insights"
+            : link ? "Apify ยังไม่มีข้อมูล/ปิดอยู่ — reactions ใช้ค่า Page Insights, Share/Comment ว่าง"
+            : (post
+                ? `✓ จับคู่โพสต์จริง ${post._by==="id"?"(ตรงด้วย post id)":"(ประมาณจากยอด impressions)"} แต่ไม่มีลิงก์ให้ยิง Apify`
+                : "ยังจับคู่โพสต์จริงไม่ได้ · reach/impression ใช้ค่า ads แทน")
+          }</div>
 
           <div class="pp-sec">Share Comments and Post Click</div>
           <div class="pp-box">
-            ${stat("","Share",true)}
-            ${stat("","Comment",true)}
+            ${stat(RE.share.v,"Share",RE.share.na)}
+            ${stat(RE.comment.v,"Comment",RE.comment.na)}
             ${stat(num(post&&post.clicks?post.clicks:clicks),"Post Click")}
           </div>
 
