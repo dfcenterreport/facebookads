@@ -878,13 +878,14 @@ async function loadBiddable(){
   }
   document.getElementById("bidContent").innerHTML='<div class="loading">กำลังดึงข้อมูลจาก Windsor…</div>';
   try{
-    let data=null, opt="";
+    let data=null, opt="", lastStatus=0, lastBody="";
     for(const o of BID_OPT_TIERS){
       const f=BID_BASE+(o?","+o:"");
       const res=await wfetch(`date_preset=${bidPreset}&fields=${f}`);
       if(res.ok){ data=(await res.json()).data||[]; opt=o; break; }
+      lastStatus=res.status; lastBody=(await res.text()).slice(0,200);
     }
-    if(data===null) throw new Error("Windsor ปฏิเสธทุกชุด field");
+    if(data===null) throw new Error(`Windsor ปฏิเสธทุกชุด field (HTTP ${lastStatus}: ${lastBody||"—"})`);
     bidNoImg = !/thumbnail_url/.test(opt);
     bidRaw=data.map(r=>({
       account:acctOf(r), campaign:r.campaign||"(ไม่ระบุแคมเปญ)",
