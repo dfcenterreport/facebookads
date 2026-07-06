@@ -327,8 +327,10 @@ const USE_PROXY = location.protocol === "http:" || location.protocol === "https:
 const ENDPOINT = USE_PROXY ? "/api/windsor" : "https://connectors.windsor.ai/all";
 function wfetch(params, connector){
   if(USE_PROXY){
+    // รันผ่าน server (Railway): ใช้ key จาก env `Windsor_key` ฝั่ง server เท่านั้น
+    // ไม่ส่ง key จาก browser เพื่อไม่ให้ key เก่า/ผิดใน localStorage ไปทับ
     const p = connector ? `connector=${connector}&${params}` : params;
-    return fetch(`${ENDPOINT}?${p}`, {headers: API_KEY ? {"x-windsor-key":API_KEY} : {}});
+    return fetch(`${ENDPOINT}?${p}`);
   }
   const base = connector ? `https://connectors.windsor.ai/${connector}` : ENDPOINT;
   return fetch(`${base}?api_key=${API_KEY}&${params}`);
@@ -1204,6 +1206,8 @@ document.getElementById("accountFilter").onchange=e=>{
 };
 document.getElementById("keyBtn").onclick=()=>{ if(ensureKey(true)) load(); };
 document.getElementById("keyBtnLanding").onclick=()=>{ if(ensureKey(true)){ landingAccts=[]; loadAccounts(); } };
+// รันผ่าน server: key อยู่ฝั่ง server แล้ว → ซ่อนปุ่ม 🔑 Key (ไม่ต้องกรอกเอง)
+if(USE_PROXY){ ["keyBtn","keyBtnLanding"].forEach(id=>{ const b=document.getElementById(id); if(b) b.style.display="none"; }); }
 document.getElementById("backBtn").onclick=showLanding;
 
 const SIDE_VIEWS=["biddable","activeacct"];
