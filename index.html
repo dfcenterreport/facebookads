@@ -266,6 +266,7 @@
       </div>
       <button id="bidRefresh" class="btn-primary">↻ รีเฟรช</button>
       <button id="bidDebug" title="ตรวจข้อมูล facebook_organic">🔧</button>
+      <button id="bidApifyDebug" title="ทดสอบ Apify (reactions/share/comment)">🧪</button>
     </div>
   </div>
   <div id="bidContent"><div class="loading">กำลังดึงข้อมูลจาก Windsor…</div></div>
@@ -1195,6 +1196,26 @@ document.getElementById("bidDebug").onclick=async()=>{
       const txt=await res.text();
       html+=`<div style="margin-top:10px"><b>${name}</b> → HTTP ${res.status}<pre style="white-space:pre-wrap;font-size:11px;max-height:180px;overflow:auto;background:var(--well);padding:8px;border-radius:4px;margin-top:4px">${txt.slice(0,1200).replace(/&/g,"&amp;").replace(/</g,"&lt;")}</pre></div>`;
     }catch(e){ html+=`<div style="margin-top:10px"><b>${name}</b> → ERROR ${e.message}</div>`; }
+  }
+  box.innerHTML=html;
+};
+document.getElementById("bidApifyDebug").onclick=async()=>{
+  const out=document.getElementById("bidContent");
+  out.insertAdjacentHTML("afterbegin",'<div id="apdbg" class="panel" style="margin-bottom:16px">⏳ กำลังทดสอบ Apify…</div>');
+  const box=document.getElementById("apdbg");
+  // หา post URL ไปทดสอบ: จาก creative ที่ match ได้ ก่อน แล้วค่อยจาก organic
+  let url="";
+  for(const c of (bidCreatives||[])){ const p=matchOrgPost(c); if(p&&p.permalink){ url=p.permalink; break; } if(c.link){ url=c.link; break; } }
+  if(!url && orgPosts.length) url=orgPosts.find(p=>p.permalink)?.permalink||"";
+  let html='<b>🧪 Apify debug</b> <button onclick="this.closest(\'#apdbg\').remove()" style="float:right">ปิด</button>';
+  html+=`<div style="margin-top:8px;font-size:12px">post URL ที่ทดสอบ: <code>${(url||"(ไม่พบลิงก์ — เลือกแคมเปญที่ match โพสต์ได้ก่อน)").replace(/</g,"&lt;")}</code></div>`;
+  if(url){
+    try{
+      const res=await fetch(`/api/apify?url=${encodeURIComponent(url)}`);
+      const txt=await res.text();
+      html+=`<div style="margin-top:10px"><b>/api/apify</b> → HTTP ${res.status}<pre style="white-space:pre-wrap;font-size:11px;max-height:280px;overflow:auto;background:var(--well);padding:8px;border-radius:4px;margin-top:4px">${txt.slice(0,2500).replace(/&/g,"&amp;").replace(/</g,"&lt;")}</pre></div>`;
+      html+=`<div style="margin-top:6px;font-size:11px;color:var(--muted)">ดู field ในผลว่ามี likes / shares / comments (หรือ reactionLoveCount ฯลฯ) ไหม ถ้าชื่อไม่ตรง บอกผมได้เลย</div>`;
+    }catch(e){ html+=`<div style="margin-top:10px">ERROR ${e.message}</div>`; }
   }
   box.innerHTML=html;
 };
