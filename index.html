@@ -351,10 +351,12 @@ const KEY_STORE = "windsor_api_key";
 let API_KEY = localStorage.getItem(KEY_STORE) || "";
 
 function ensureKey(force){
+  // รันผ่าน server (Railway): key อยู่ที่ env `Windsor_key` ฝั่ง server → ไม่ต้องกรอก
+  if(USE_PROXY && !force) return true;
   if(!API_KEY || force){
     const k = prompt("กรอก Windsor API key:", API_KEY || "");
     if(k && k.trim()){ API_KEY = k.trim(); localStorage.setItem(KEY_STORE, API_KEY); return true; }
-    return !!API_KEY;
+    return USE_PROXY || !!API_KEY;
   }
   return true;
 }

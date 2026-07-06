@@ -1,8 +1,8 @@
 // Tiny proxy + static server for the Windsor dashboard.
 // - Serves index.html (static)
 // - /api/windsor proxies to Windsor (same-origin → no browser CORS issue)
-//   API key comes from the request header (x-windsor-key, from the browser's
-//   localStorage) or from the WINDSOR_API_KEY env var. It is never committed.
+//   API key comes from the `Windsor_key` env var (set in Railway), or from the
+//   request header (x-windsor-key) as an override. It is never committed.
 const express = require("express");
 const path = require("path");
 
@@ -12,7 +12,7 @@ const PORT = process.env.PORT || 3000;
 const ALLOWED_CONNECTORS = new Set(["all", "facebook", "facebook_organic", "instagram", "tiktok", "tiktok_organic", "twitter"]);
 
 app.get("/api/windsor", async (req, res) => {
-  const key = req.header("x-windsor-key") || process.env.WINDSOR_API_KEY || "";
+  const key = req.header("x-windsor-key") || process.env.Windsor_key || process.env.WINDSOR_API_KEY || "";
   if (!key) return res.status(400).json({ error: "missing Windsor API key" });
 
   const params = new URLSearchParams(req.query);
