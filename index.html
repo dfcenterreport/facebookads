@@ -573,17 +573,24 @@ async function loadActiveAccounts(){
   document.getElementById("activeAcctContent").innerHTML='<div class="loading">กำลังดึงข้อมูลจาก Windsor…</div>';
   const range = acctPreset==="custom" ? `date_from=${acctCustomFrom}&date_to=${acctCustomTo}` : `date_preset=${acctPreset}`;
   try{
-    const res = await wfetch(`${range}&fields=account_name,campaign_status,spend`);
+    const res = await wfetch(`${range}&fields=account_name,campaign,campaign_status,spend`);
     if(!res.ok) throw new Error("HTTP "+res.status);
     const rows=(await res.json()).data||[];
     const map={};
     rows.forEach(r=>{
       const a=acctOf(r);
-      if(!map[a]) map[a]={name:a,active:false,spend:0};
-      if((r.campaign_status||"").toUpperCase()==="ACTIVE") map[a].active=true;
+      if(!map[a]) map[a]={name:a,active:false,spend:0,campaigns:{}};
+      const status=(r.campaign_status||"").toUpperCase();
+      if(status==="ACTIVE") map[a].active=true;
       map[a].spend+=+r.spend||0;
+      const cname=r.campaign||"(ไม่ระบุแคมเปญ)";
+      if(!map[a].campaigns[cname]) map[a].campaigns[cname]={name:cname,status,spend:0};
+      map[a].campaigns[cname].spend+=+r.spend||0;
+      if(status) map[a].campaigns[cname].status=status;
     });
-    activeAcctData=Object.values(map).sort((a,b)=>b.spend-a.spend);
+    activeAcctData=Object.values(map)
+      .map(v=>({...v,campaigns:Object.values(v.campaigns).sort((a,b)=>b.spend-a.spend)}))
+      .sort((a,b)=>b.spend-a.spend);
     renderActiveAccounts();
   }catch(e){
     document.getElementById("activeAcctContent").innerHTML=`<div class="error">❌ โหลดข้อมูลไม่สำเร็จ: ${e.message}</div>`;
@@ -596,16 +603,34 @@ function renderActiveAccounts(){
   const periodLabel = ACCT_PRESET_LABEL[acctPreset] || "";
   const total = list.reduce((s,a)=>s+a.spend,0);
   document.getElementById("acctTotalBudget").textContent = fmtMoney(total);
-  const rows=list.map(a=>`
-    <div class="acct-row">
-      <div class="acct-ico">${a.active?'🟢':'⚪'}</div>
-      <div class="acct-info">
-        <div class="acct-name">${a.name}</div>
-        <div class="acct-id">${a.active?'<span class="tag active">ACTIVE</span>':'<span class="tag paused">INACTIVE</span>'}</div>
+  const rows=list.map((a,i)=>{
+    const camps=(a.campaigns||[]).map(c=>`
+        <div style="display:flex;justify-content:space-between;align-items:center;gap:12px;padding:7px 0;border-bottom:1px solid var(--border);font-size:13px">
+          <span>${c.status==="ACTIVE"?'<span class="tag active">ACTIVE</span>':'<span class="tag paused">'+(c.status||'—')+'</span>'} ${c.name}</span>
+          <span class="num" style="white-space:nowrap">${fmtMoney(c.spend)}</span>
+        </div>`).join("") || '<div style="padding:7px 0;color:var(--muted);font-size:13px">ไม่มีแคมเปญในช่วงเวลานี้</div>';
+    return `
+    <div style="margin-bottom:12px">
+      <div class="acct-row" style="margin-bottom:0;cursor:pointer" onclick="toggleAcctRow(${i})">
+        <div class="acct-ico">${a.active?'🟢':'⚪'}</div>
+        <div class="acct-info">
+          <div class="acct-name"><span class="car" id="acct-car-${i}">▸</span>${a.name}</div>
+          <div class="acct-id">${a.active?'<span class="tag active">ACTIVE</span>':'<span class="tag paused">INACTIVE</span>'}</div>
+        </div>
+        <div class="acct-meta"><div class="spend">${fmtMoney(a.spend)}</div><div class="cap">Spend ${periodLabel}</div></div>
       </div>
-      <div class="acct-meta"><div class="spend">${fmtMoney(a.spend)}</div><div class="cap">Spend ${periodLabel}</div></div>
-    </div>`).join("");
+      <div id="acct-camps-${i}" style="display:none;padding:4px 18px 8px 78px;background:var(--well);border:1px solid var(--border);border-top:none;border-radius:0 0 8px 8px">
+        ${camps}
+      </div>
+    </div>`;
+  }).join("");
   document.getElementById("activeAcctContent").innerHTML = rows || '<div class="loading">ไม่พบ Ad Account ตามตัวกรองนี้</div>';
+}
+
+function toggleAcctRow(i){
+  const el=document.getElementById("acct-camps-"+i); if(!el) return;
+  el.style.display = el.style.display==="none"?"block":"none";
+  const car=document.getElementById("acct-car-"+i); if(car) car.textContent = car.textContent==="▸"?"▾":"▸";
 }
 
 let acctMonthlyChart = null, acctMonthlyLoaded = false, acctQuarterChart = null;
