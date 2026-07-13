@@ -65,6 +65,9 @@
 
   .grid{display:grid;grid-template-columns:1fr;gap:16px;margin-bottom:16px}
   .panel{background:var(--surface);border:1px solid var(--border);border-radius:8px;padding:20px}
+  .bid-split{display:flex;gap:16px;align-items:flex-start}
+  .bid-split>.panel{flex:1 1 0;min-width:0}
+  @media (max-width:900px){.bid-split{flex-direction:column}.bid-split>.panel{width:100%}}
   .panel-head{display:flex;justify-content:space-between;align-items:center;margin-bottom:6px}
   .panel .psub{color:var(--muted);font-size:13px;margin-bottom:14px}
   canvas{max-height:300px}
@@ -975,7 +978,8 @@ function renderBiddable(){
       ${kpi("Clicks",fmtK(t.clicks))}${kpi("CPM","฿"+cpm.toFixed(2))}${kpi("CPC","฿"+cpc.toFixed(2))}
       ${kpi("CTR",fmtPct(ctr))}${kpi("Frequency",freq.toFixed(2))}
     </div>
-    <div class="panel" style="margin-bottom:16px">
+    <div class="bid-split">
+    <div class="panel">
       <div class="panel-head"><h3>Spend & Reach รายวัน</h3></div>
       <div class="psub">แนวโน้มต้นทุนและการเข้าถึงของ${bidCampaign?"แคมเปญ":"บัญชี"}ที่เลือก</div>
       <canvas id="bidTrend"></canvas>
@@ -984,6 +988,7 @@ function renderBiddable(){
       <div class="panel-head"><h3>🎨 Creative Breakdown</h3><span style="color:var(--muted);font-size:12px">${bidCreatives.length} creatives</span></div>
       <div class="psub">รวมครีเอทีฟที่ Link Post เดียวกันเป็นชิ้นเดียว (reach = unique/max ไม่ sum) · คลิกเพื่อดูรายวัน${bidNoImg?' · (ไม่มี thumbnail)':''}</div>
       ${creBlock}
+    </div>
     </div>`;
 
   drawBidTrend(data,dates);
