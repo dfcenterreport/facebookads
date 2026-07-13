@@ -896,7 +896,9 @@ async function loadBiddable(){
     let data=null, opt="", lastStatus=0, lastBody="";
     for(const o of BID_OPT_TIERS){
       const f=BID_BASE+(o?","+o:"");
-      const res=await wfetch(`date_preset=${bidPreset}&fields=${f}`);
+      // ใช้ connector "facebook" ตรงๆ — มี field เฉพาะ FB ครบ (effective_object_story_id, thumbnail_url)
+      // ต่างจาก "/all" ที่รวมหลาย source แล้ว field เฉพาะ FB มักหาย (โดยเฉพาะ video ad)
+      const res=await wfetch(`date_preset=${bidPreset}&fields=${f}`, "facebook");
       if(res.ok){ data=(await res.json()).data||[]; opt=o; break; }
       lastStatus=res.status; lastBody=(await res.text()).slice(0,200);
       // ถ้าเป็นปัญหา key/สิทธิ์ (ไม่ใช่ field) ไม่ต้องลอง tier ต่อ
