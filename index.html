@@ -327,14 +327,20 @@
 const USE_PROXY = location.protocol === "http:" || location.protocol === "https:";
 const ENDPOINT = USE_PROXY ? "/api/windsor" : "https://connectors.windsor.ai/all";
 function wfetch(params, connector){
+  // timeout กันค้าง: ถ้าเกิน 45 วิให้ยกเลิก → เด้ง error แทนหมุนไม่จบ
+  const ctrl = new AbortController();
+  const t = setTimeout(()=>ctrl.abort(), 45000);
+  let p;
   if(USE_PROXY){
     // รันผ่าน server (Railway): ใช้ key จาก env `Windsor_key` ฝั่ง server เท่านั้น
     // ไม่ส่ง key จาก browser เพื่อไม่ให้ key เก่า/ผิดใน localStorage ไปทับ
-    const p = connector ? `connector=${connector}&${params}` : params;
-    return fetch(`${ENDPOINT}?${p}`);
+    const q = connector ? `connector=${connector}&${params}` : params;
+    p = fetch(`${ENDPOINT}?${q}`, {signal: ctrl.signal});
+  }else{
+    const base = connector ? `https://connectors.windsor.ai/${connector}` : ENDPOINT;
+    p = fetch(`${base}?api_key=${API_KEY}&${params}`, {signal: ctrl.signal});
   }
-  const base = connector ? `https://connectors.windsor.ai/${connector}` : ENDPOINT;
-  return fetch(`${base}?api_key=${API_KEY}&${params}`);
+  return p.finally(()=>clearTimeout(t));
 }
 const FIELDS = "source,account_name,account_id,campaign,campaign_status,objective,clicks,spend,impressions,reach,date";
 const PREV_FIELDS = "source,account_name,spend,impressions,reach,clicks";
@@ -902,6 +908,8 @@ async function loadBiddable(){
       const res=await wfetch(`date_preset=${bidPreset}&fields=${f}`);
       if(res.ok){ data=(await res.json()).data||[]; opt=o; break; }
       lastStatus=res.status; lastBody=(await res.text()).slice(0,200);
+      // ถ้าเป็นปัญหา key/สิทธิ์ (ไม่ใช่ field) ไม่ต้องลอง tier ต่อ
+      if([400,401,403].includes(lastStatus) && /key|auth|token|unauthor|permission/i.test(lastBody)) break;
     }
     if(data===null) throw new Error(`Windsor ปฏิเสธทุกชุด field (HTTP ${lastStatus}: ${lastBody||"—"})`);
     bidNoImg = !/thumbnail_url/.test(opt);
@@ -922,7 +930,8 @@ async function loadBiddable(){
     renderBiddable();
     loadOrganic();   // เติมข้อมูลโพสต์จริง (permalink/reactions) แบบเบื้องหลัง
   }catch(e){
-    document.getElementById("bidContent").innerHTML=`<div class="error">❌ ดึงข้อมูลไม่สำเร็จ: ${e.message}</div>`;
+    const msg = e.name==="AbortError" ? "หมดเวลา (timeout 45s) — Windsor ตอบช้า/ไม่ตอบ อาจเพราะ field เยอะเกินหรือ server มีปัญหา" : e.message;
+    document.getElementById("bidContent").innerHTML=`<div class="error">❌ ดึงข้อมูลไม่สำเร็จ: ${msg}</div>`;
   }
 }
 
