@@ -862,7 +862,7 @@ async function loadOrganic(){
 // id = "{pageid}_{postid}" → เทียบส่วน postid ท้ายสุด (page id อาจต่างกัน)
 const postSuffix=s=>{ const p=String(s||"").split("_"); return p.length>=2?p[p.length-1]:(String(s||"").match(/(\d{6,})\/?$/)||[])[1]||""; };
 let orgMatch={};   // key = ad||adset → org post
-const creKey=c=>c.ad+"||"+c.adset;
+const creKey=c=>c.key||(c.ad+"||"+c.adset);
 function computeOrgMatches(){
   orgMatch={};
   if(!orgPosts.length || !bidCreatives.length) return;
@@ -942,8 +942,7 @@ function renderBidCampaigns(){
   const spendBy={}; rows.forEach(r=>spendBy[r.campaign]=(spendBy[r.campaign]||0)+r.spend);
   const camps=Object.keys(spendBy).sort((a,b)=>spendBy[b]-spendBy[a]);
   if(bidCampaign && !camps.includes(bidCampaign)) bidCampaign="";
-  // เลือกอัตโนมัติถ้าพบแคมเปญ Pao Society (จากคำขอ)
-  if(!bidCampaign){ const pao=camps.find(c=>/pao\s*society/i.test(c))||camps.find(c=>/society/i.test(c)); if(pao) bidCampaign=pao; }
+  // ค่าเริ่มต้น = ทุกแคมเปญ (creative-based) — เป็นตัวกรองเสริมเท่านั้น ไม่บังคับเลือก
   sel.innerHTML=`<option value="">— ทุกแคมเปญ (${camps.length}) —</option>`+
     camps.map(c=>`<option value="${c.replace(/"/g,'&quot;')}"${c===bidCampaign?' selected':''}>${c} · ${fmtMoney(spendBy[c])}</option>`).join("");
 }
@@ -959,18 +958,16 @@ function renderBiddable(){
 
   if(!dates.length){ document.getElementById("bidContent").innerHTML='<div class="loading">ไม่มีข้อมูลในช่วง/บัญชีที่เลือก</div>'; return; }
 
-  // KPI รวมของบัญชี/แคมเปญที่เลือก
-  const t=data.reduce((a,r)=>{a.spend+=r.spend;a.impr+=r.impressions;a.reach+=r.reach;a.clicks+=r.clicks;return a;},{spend:0,impr:0,reach:0,clicks:0});
+  // รวมครีเอทีฟตามโพสต์ก่อน แล้วคำนวณ KPI จากตรงนั้น (reach = ผลรวมของ max ต่อโพสต์ ไม่ใช่ sum ทุกแถว)
+  bidCreatives = buildCreatives(data);
+  computeOrgMatches();
+  const t=bidCreatives.reduce((a,c)=>{a.spend+=c.spend;a.impr+=c.impressions;a.reach+=c.reach;a.clicks+=c.clicks;return a;},{spend:0,impr:0,reach:0,clicks:0});
   const cpm=t.impr?t.spend/t.impr*1000:0, cpc=t.clicks?t.spend/t.clicks:0, ctr=t.impr?t.clicks/t.impr:0, freq=t.reach?t.impr/t.reach:0;
   const kpi=(l,v)=>`<div class="kpi"><div class="klabel">${l}</div><div class="kval">${v}</div></div>`;
 
-  bidCreatives = buildCreatives(data);
-  computeOrgMatches();
-  const creBlock = bidCampaign
-    ? (bidCreatives.length
-        ? `<div class="cre-grid">${bidCreatives.map((c,i)=>creCard(c,i)).join("")}</div><div id="creDetail"></div>`
-        : '<div class="bc-none">ไม่พบ creative ในแคมเปญนี้</div>')
-    : '<div class="footnote">เลือกแคมเปญด้านบนเพื่อดู creative แต่ละตัว แล้วคลิกที่ creative เพื่อดูข้อมูลรายวัน</div>';
+  const creBlock = bidCreatives.length
+    ? `<div class="cre-grid">${bidCreatives.map((c,i)=>creCard(c,i)).join("")}</div><div id="creDetail"></div>`
+    : '<div class="bc-none">ไม่พบ creative</div>';
 
   document.getElementById("bidContent").innerHTML=`
     <div class="kpis">
@@ -984,8 +981,8 @@ function renderBiddable(){
       <canvas id="bidTrend"></canvas>
     </div>
     <div class="panel">
-      <div class="panel-head"><h3>🎨 Creative Breakdown</h3><span style="color:var(--muted);font-size:12px">${bidCampaign?bidCreatives.length+" creatives":""}</span></div>
-      <div class="psub">${bidCampaign?"คลิกที่ creative เพื่อดูข้อมูลรายวันแยกแต่ละตัว":"—"}${bidNoImg?' · (Windsor ไม่ส่ง thumbnail — แสดงเฉพาะชื่อ)':''}</div>
+      <div class="panel-head"><h3>🎨 Creative Breakdown</h3><span style="color:var(--muted);font-size:12px">${bidCreatives.length} creatives</span></div>
+      <div class="psub">รวมครีเอทีฟที่ Link Post เดียวกันเป็นชิ้นเดียว (reach = unique/max ไม่ sum) · คลิกเพื่อดูรายวัน${bidNoImg?' · (ไม่มี thumbnail)':''}</div>
       ${creBlock}
     </div>`;
 
@@ -993,16 +990,23 @@ function renderBiddable(){
 }
 
 function buildCreatives(data){
+  // รวมตาม "โพสต์เดียวกัน" (post id จาก storyId) → ครีเอทีฟที่ยิงหลายแคมเปญ/adset แต่โพสต์เดียวกัน = การ์ดเดียว
+  // spend/impressions/clicks = รวม (sum) ; reach = unique → ใช้ max ไม่ sum
   const m={};
   data.forEach(r=>{
-    const k=r.ad+"||"+r.adset;
-    if(!m[k]) m[k]={ad:r.ad,adset:r.adset,thumb:"",link:"",storyId:"",spend:0,impressions:0,reach:0,clicks:0,days:{}};
-    const c=m[k]; c.spend+=r.spend;c.impressions+=r.impressions;c.reach+=r.reach;c.clicks+=r.clicks;
+    const pid=postSuffix(r.storyId);
+    const k = pid ? "post:"+pid : "ad:"+r.ad+"|"+r.adset;
+    if(!m[k]) m[k]={key:k,ad:r.ad,adset:r.adset,thumb:"",link:"",storyId:r.storyId||"",spend:0,impressions:0,reach:0,clicks:0,days:{},campaigns:new Set(),adsets:new Set()};
+    const c=m[k];
+    c.spend+=r.spend; c.impressions+=r.impressions; c.clicks+=r.clicks;
+    c.reach=Math.max(c.reach, r.reach);          // reach = unique → max
+    if(r.campaign) c.campaigns.add(r.campaign);
+    if(r.adset) c.adsets.add(r.adset);
     if(!c.thumb && r.thumb) c.thumb=r.thumb;
     if(!c.link && r.link) c.link=r.link;
     if(!c.storyId && r.storyId) c.storyId=r.storyId;
-    if(!c.days[r.date]) c.days[r.date]={spend:0,impr:0,reach:0,clicks:0};
-    const d=c.days[r.date]; d.spend+=r.spend;d.impr+=r.impressions;d.reach+=r.reach;d.clicks+=r.clicks;
+    const d = c.days[r.date] || (c.days[r.date]={spend:0,impr:0,reach:0,clicks:0});
+    d.spend+=r.spend; d.impr+=r.impressions; d.clicks+=r.clicks; d.reach=Math.max(d.reach, r.reach);
   });
   return Object.values(m).sort((a,b)=>b.spend-a.spend);
 }
@@ -1017,7 +1021,7 @@ function creCard(c,i){
     ${thumb}
     <div class="cre-body">
       <div class="cre-name" title="${c.ad.replace(/"/g,'&quot;')}">${c.ad}</div>
-      <div class="cre-adset" title="${c.adset.replace(/"/g,'&quot;')}">${c.adset}</div>
+      <div class="cre-adset" title="${c.adset.replace(/"/g,'&quot;')}">${c.adsets&&c.adsets.size>1?`รวม ${c.adsets.size} adsets · ${c.campaigns.size} แคมเปญ`:c.adset}</div>
       <div class="brk-metrics">
         ${metric("Spend",fmtMoney(c.spend))}${metric("Reach",fmtK(c.reach))}
         ${metric("CPM","฿"+cpm.toFixed(1))}${metric("CTR",fmtPct(ctr))}
