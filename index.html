@@ -146,6 +146,16 @@
   .cre-adset{font-size:11px;color:var(--muted);margin:2px 0 4px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
   .cre-detail{margin-top:16px;border:1px solid var(--border);border-radius:8px;padding:20px;background:var(--surface)}
 
+  /* ===== Slide-in drawer (คลิก creative → เลื่อนเข้าจากขวา) ===== */
+  .cre-overlay{position:fixed;inset:0;background:rgba(0,0,0,.45);opacity:0;visibility:hidden;transition:opacity .25s ease;z-index:998}
+  .cre-overlay.open{opacity:1;visibility:visible}
+  .cre-drawer{position:fixed;top:0;right:0;height:100vh;width:min(820px,94vw);background:var(--surface);border-left:1px solid var(--border);box-shadow:-12px 0 40px rgba(0,0,0,.28);transform:translateX(100%);transition:transform .32s cubic-bezier(.4,0,.2,1);z-index:999;overflow-y:auto;padding:24px;overscroll-behavior:contain}
+  .cre-drawer.open{transform:translateX(0)}
+  .cre-drawer-close{position:sticky;top:0;float:right;margin:-8px -8px 0 0;width:34px;height:34px;border:1px solid var(--border);background:var(--surface);border-radius:8px;font-size:16px;line-height:1;cursor:pointer;color:var(--muted);z-index:1;transition:.12s}
+  .cre-drawer-close:hover{background:var(--well);color:var(--text)}
+  .cre-drawer .cre-detail{margin-top:0;border:0;padding:0;border-radius:0}
+  @media(max-width:760px){.cre-drawer{padding:16px}}
+
   /* ===== Post performance card (สไตล์ Performance for your post) ===== */
   .post-perf{display:grid;grid-template-columns:300px 1fr;gap:26px}
   @media(max-width:760px){.post-perf{grid-template-columns:1fr}}
@@ -969,7 +979,12 @@ function renderBiddable(){
   const kpi=(l,v)=>`<div class="kpi"><div class="klabel">${l}</div><div class="kval">${v}</div></div>`;
 
   const creBlock = bidCreatives.length
-    ? `<div class="cre-grid">${bidCreatives.map((c,i)=>creCard(c,i)).join("")}</div><div id="creDetail"></div>`
+    ? `<div class="cre-grid">${bidCreatives.map((c,i)=>creCard(c,i)).join("")}</div>
+       <div id="creOverlay" class="cre-overlay" onclick="closeCreDrawer()"></div>
+       <aside id="creDrawer" class="cre-drawer" role="dialog" aria-modal="true" aria-label="รายละเอียด creative">
+         <button class="cre-drawer-close" onclick="closeCreDrawer()" title="ปิด" aria-label="ปิด">✕</button>
+         <div id="creDetail"></div>
+       </aside>`
     : '<div class="bc-none">ไม่พบ creative</div>';
 
   document.getElementById("bidContent").innerHTML=`
@@ -1160,8 +1175,18 @@ function selectCreative(i){
         </div>
       </div>
     </div>`;
-  det.scrollIntoView({behavior:"smooth",block:"nearest"});
+  const drawer=document.getElementById("creDrawer"), ov=document.getElementById("creOverlay");
+  if(drawer){ const wasOpen=drawer.classList.contains("open"); drawer.classList.add("open"); if(ov) ov.classList.add("open"); if(!wasOpen) drawer.scrollTop=0; }
 }
+
+function closeCreDrawer(){
+  const d=document.getElementById("creDrawer"), o=document.getElementById("creOverlay");
+  if(d) d.classList.remove("open");
+  if(o) o.classList.remove("open");
+  document.querySelectorAll(".cre-card.sel").forEach(x=>x.classList.remove("sel"));
+  bidSel=null;
+}
+document.addEventListener("keydown",e=>{ if(e.key==="Escape") closeCreDrawer(); });
 
 function drawBidTrend(data,dates){
   const by={}; dates.forEach(d=>by[d]={spend:0,reach:0});
