@@ -53,6 +53,27 @@
 
   /* KPI cards */
   .kpis{display:grid;grid-template-columns:repeat(auto-fit,minmax(180px,1fr));gap:14px;margin-bottom:20px}
+  .kpis.compact{grid-template-columns:repeat(4,1fr);gap:10px;margin:18px 0 0}
+  .kpis.compact .kpi{padding:11px 13px}
+  .kpis.compact .kval{font-size:19px;margin-top:5px}
+  @media(max-width:520px){.kpis.compact{grid-template-columns:repeat(2,1fr)}}
+
+  /* ===== AI Recommendation ===== */
+  .ai-reco{margin-top:22px;border-top:1px solid var(--border);padding-top:18px}
+  .ai-reco-head{display:flex;align-items:center;gap:10px;margin-bottom:4px}
+  .ai-reco-head h3{font-size:16px;font-weight:700;color:var(--ink)}
+  .ai-badge{font-size:11px;font-weight:700;letter-spacing:.04em;color:#5a4b00;background:linear-gradient(135deg,var(--yellow),#ffe873);padding:3px 9px;border-radius:999px}
+  .ai-count{margin-left:auto;font-size:12px;color:var(--muted)}
+  .ai-reco-sub{color:var(--muted);font-size:12px;margin-bottom:14px}
+  .ai-reco-list{display:flex;flex-direction:column;gap:10px}
+  .reco{display:flex;gap:12px;padding:12px 14px;border:1px solid var(--border);border-left-width:3px;border-radius:8px;background:var(--well)}
+  .reco-ic{font-size:18px;line-height:1.5;flex:0 0 auto}
+  .reco-t{font-weight:600;font-size:14px;margin-bottom:2px;color:var(--ink)}
+  .reco-d{font-size:13px;color:var(--muted);line-height:1.55}
+  .reco-good{border-left-color:var(--good)}
+  .reco-warn{border-left-color:#e0a800}
+  .reco-bad{border-left-color:var(--bad)}
+  .reco-info{border-left-color:var(--gray)}
   .kpi{background:var(--surface);border:1px solid var(--border);border-radius:8px;padding:16px}
   .kpi.primary{border-left:4px solid var(--yellow)}
   .kpi .klabel{font-family:'JetBrains Mono',monospace;font-size:11px;font-weight:500;letter-spacing:.05em;color:var(--muted);text-transform:uppercase}
@@ -987,17 +1008,20 @@ function renderBiddable(){
        </aside>`
     : '<div class="bc-none">ไม่พบ creative</div>';
 
+  const recoHtml = bidRecoBlock(t, bidCreatives);
+
   document.getElementById("bidContent").innerHTML=`
-    <div class="kpis">
-      ${kpi("Spend",fmtMoney(t.spend))}${kpi("Reach",fmtK(t.reach))}${kpi("Impressions",fmtK(t.impr))}
-      ${kpi("Clicks",fmtK(t.clicks))}${kpi("CPM","฿"+cpm.toFixed(2))}${kpi("CPC","฿"+cpc.toFixed(2))}
-      ${kpi("CTR",fmtPct(ctr))}${kpi("Frequency",freq.toFixed(2))}
-    </div>
     <div class="bid-split">
     <div class="panel">
       <div class="panel-head"><h3>Spend & Reach รายวัน</h3></div>
       <div class="psub">แนวโน้มต้นทุนและการเข้าถึงของ${bidCampaign?"แคมเปญ":"บัญชี"}ที่เลือก</div>
       <canvas id="bidTrend"></canvas>
+      <div class="kpis compact">
+        ${kpi("Spend",fmtMoney(t.spend))}${kpi("Reach",fmtK(t.reach))}${kpi("Impressions",fmtK(t.impr))}
+        ${kpi("Clicks",fmtK(t.clicks))}${kpi("CPM","฿"+cpm.toFixed(2))}${kpi("CPC","฿"+cpc.toFixed(2))}
+        ${kpi("CTR",fmtPct(ctr))}${kpi("Frequency",freq.toFixed(2))}
+      </div>
+      ${recoHtml}
     </div>
     <div class="panel">
       <div class="panel-head"><h3>🎨 Creative Breakdown</h3><span style="color:var(--muted);font-size:12px">${bidCreatives.length} creatives</span></div>
@@ -1029,6 +1053,70 @@ function buildCreatives(data){
     d.spend+=r.spend; d.impr+=r.impressions; d.clicks+=r.clicks; d.reach=Math.max(d.reach, r.reach);
   });
   return Object.values(m).sort((a,b)=>b.spend-a.spend);
+}
+
+// ===== AI Recommendation (rule-based) — วิเคราะห์ KPI/creative แล้วสร้างคำแนะนำ =====
+function bidRecommendations(t, list){
+  const recos=[];
+  const push=(level,ic,title,detail)=>recos.push({level,ic,title,detail});
+  const short=s=>{ s=String(s==null?"":s); return s.length>44?s.slice(0,42)+"…":s; };
+  const ctr=t.impr?t.clicks/t.impr:0;
+  const freq=t.reach?t.impr/t.reach:0;
+  const cpm=t.impr?t.spend/t.impr*1000:0;
+
+  // 1) CTR เทียบเกณฑ์อุตสาหกรรม (~0.9%)
+  if(t.impr>0){
+    if(ctr<0.005) push("bad","🎯",`CTR ต่ำ (${fmtPct(ctr)})`,`ต่ำกว่าค่าเฉลี่ยทั่วไป (~0.9%) มาก — ครีเอทีฟ/ข้อความอาจไม่ดึงดูด ลองเปลี่ยน hook รูปหรือพาดหัว และทบทวน targeting`);
+    else if(ctr<0.009) push("warn","🎯",`CTR ค่อนข้างต่ำ (${fmtPct(ctr)})`,`ยังต่ำกว่าค่าเฉลี่ยอุตสาหกรรม (~0.9%) — ลองทดสอบครีเอทีฟใหม่เพื่อดันอัตราคลิก`);
+    else push("good","🎯",`CTR อยู่ในเกณฑ์ดี (${fmtPct(ctr)})`,`สูงกว่าค่าเฉลี่ยทั่วไป — ครีเอทีฟทำงานได้ดี พิจารณาเพิ่มงบให้ตัวที่เด่น`);
+  }
+
+  // 2) Frequency / ad fatigue
+  if(freq>=5) push("bad","🔁",`Frequency สูงมาก (${freq.toFixed(2)})`,`ผู้ชมเห็นซ้ำเฉลี่ย ${freq.toFixed(1)} ครั้ง เสี่ยง ad fatigue สูง — ควรเปลี่ยนครีเอทีฟหรือขยายกลุ่มเป้าหมาย`);
+  else if(freq>=3.5) push("warn","🔁",`Frequency เริ่มสูง (${freq.toFixed(2)})`,`เข้าเขตเสี่ยงเห็นซ้ำ (>3.5) เริ่มมีสัญญาณ fatigue — เตรียมครีเอทีฟใหม่หมุนเวียนไว้`);
+
+  // 3) วิเคราะห์รายครีเอทีฟ
+  const wm=list.map(c=>({ c,
+    ctr:c.impressions?c.clicks/c.impressions:0,
+    cpm:c.impressions?c.spend/c.impressions*1000:0,
+    spend:c.spend })).filter(x=>x.spend>0);
+  if(wm.length>=2){
+    const sig=wm.filter(x=>x.spend>=t.spend*0.03);
+    const pool=sig.length?sig:wm;
+    const best=[...pool].sort((a,b)=>b.ctr-a.ctr)[0];
+    const worst=[...pool].sort((a,b)=>a.ctr-b.ctr)[0];
+    if(best && ctr>0 && best.ctr>ctr*1.15)
+      push("good","🏆",`ครีเอทีฟเด่น: ${short(best.c.ad)}`,`CTR ${fmtPct(best.ctr)} สูงกว่าค่าเฉลี่ยรวม — พิจารณาเพิ่มงบ/ขยายผลตัวนี้`);
+    if(worst && worst!==best && worst.spend>=t.spend*0.05 && ctr>0 && worst.ctr<ctr*0.6)
+      push("bad","🛑",`ครีเอทีฟฉุดภาพรวม: ${short(worst.c.ad)}`,`ใช้งบ ${fmtMoney(worst.spend)} แต่ CTR แค่ ${fmtPct(worst.ctr)} (ต่ำกว่าค่าเฉลี่ยมาก) — พิจารณาหยุดหรือปรับใหม่`);
+    const hi=[...pool].sort((a,b)=>b.cpm-a.cpm)[0];
+    if(hi && cpm>0 && hi.cpm>cpm*1.5 && hi.spend>=t.spend*0.05)
+      push("warn","💸",`CPM สูงผิดปกติ: ${short(hi.c.ad)}`,`CPM ฿${hi.cpm.toFixed(1)} สูงกว่าค่าเฉลี่ยรวม (฿${cpm.toFixed(1)}) ~${Math.round(hi.cpm/cpm*100-100)}% — ต้นทุนการเข้าถึงแพงกว่าปกติ`);
+  }
+
+  // 4) การกระจุกตัวของงบ
+  if(wm.length>=3 && t.spend>0){
+    const sorted=[...wm].sort((a,b)=>b.spend-a.spend);
+    const share=sorted[0].spend/t.spend;
+    if(share>0.6)
+      push("info","📊","งบกระจุกตัวในครีเอทีฟเดียว",`${short(sorted[0].c.ad)} กินงบ ${Math.round(share*100)}% ของทั้งหมด — หากตัวนี้พลาดจะกระทบภาพรวม ควรกระจายความเสี่ยง`);
+  }
+
+  if(!recos.length) push("good","✅","ภาพรวมอยู่ในเกณฑ์ดี","ไม่พบสัญญาณผิดปกติที่ต้องดำเนินการเร่งด่วนในช่วงที่เลือก");
+  return recos;
+}
+
+function bidRecoBlock(t, list){
+  const esc=s=>String(s==null?"":s).replace(/&/g,"&amp;").replace(/</g,"&lt;");
+  const recos=bidRecommendations(t, list);
+  const items=recos.map(r=>
+    `<div class="reco reco-${r.level}"><div class="reco-ic">${r.ic}</div><div class="reco-tx"><div class="reco-t">${esc(r.title)}</div><div class="reco-d">${esc(r.detail)}</div></div></div>`
+  ).join("");
+  return `<div class="ai-reco">
+    <div class="ai-reco-head"><span class="ai-badge">✨ AI</span><h3>AI Recommendation</h3><span class="ai-count">${recos.length} ข้อเสนอ</span></div>
+    <div class="ai-reco-sub">วิเคราะห์อัตโนมัติจากข้อมูลช่วงที่เลือก · อ้างอิงเกณฑ์เบื้องต้นของ Facebook Ads</div>
+    <div class="ai-reco-list">${items}</div>
+  </div>`;
 }
 
 function creCard(c,i){
