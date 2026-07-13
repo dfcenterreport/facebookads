@@ -868,22 +868,13 @@ function computeOrgMatches(){
   if(!orgPosts.length || !bidCreatives.length) return;
   const avail=orgPosts.slice();
   const take=(c,p,by)=>{ p._by=by; orgMatch[creKey(c)]=p; const i=avail.indexOf(p); if(i>=0) avail.splice(i,1); };
-  // 1) จับคู่แบบแม่นด้วย post id (ถ้าฝั่ง ads ส่ง object_story_id มา)
+  // จับคู่ด้วย post id จริงเท่านั้น (effective_object_story_id ↔ post_id)
+  // post id เป็น unique ทั่วโลก → บัญชีอื่น (เช่น Bissin) จะไม่แมตช์โพสต์ Pao ผิด
+  // (เลิกเดาด้วยยอด impressions เพราะ orgPosts มีแค่เพจที่เชื่อม Page Insights ไว้ ทำให้ข้ามบัญชีผิด)
   bidCreatives.forEach(c=>{
     const cs=postSuffix(c.storyId); if(!cs) return;
     const hit=avail.find(p=>postSuffix(p.id)===cs);
     if(hit) take(c,hit,"id");
-  });
-  // 2) ที่เหลือ: จับคู่ด้วยยอด paid impressions ใกล้สุด (greedy จาก spend มากไปน้อย)
-  // เทียบ paid impressions ของ ad ↔ post (ควรตรงกันเกือบเป๊ะ) เลือกตัวใกล้สุด
-  // เกณฑ์เข้ม 8% และต้อง "ชนะขาด" ตัวรอง (กันโพสต์ยอดใกล้กันสลับผิด) ไม่งั้นปล่อยว่าง
-  bidCreatives.filter(c=>!orgMatch[creKey(c)]).sort((a,b)=>b.spend-a.spend).forEach(c=>{
-    const base=c.impressions||c.reach||0; if(!base) return;
-    const scored=avail.map(p=>{ const pv=p.imprPaid||p.impr||p.reach||0;
-      return {p, d: pv? Math.abs(base-pv)/Math.max(base,pv) : 1}; }).sort((a,b)=>a.d-b.d);
-    const best=scored[0], second=scored[1];
-    // ต้องใกล้ ≤8% และห่างจากตัวรองพอ (ตัวรอง > 2 เท่าของ best หรือไม่มีตัวรอง)
-    if(best && best.d<=0.08 && (!second || second.d > best.d*2 || second.d>0.15)) take(c,best.p,"≈");
   });
 }
 function matchOrgPost(c){ return orgMatch[creKey(c)]||null; }
