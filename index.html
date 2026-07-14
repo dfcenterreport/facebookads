@@ -401,10 +401,10 @@
 // เปิดไฟล์ตรงๆ (file://) → ดึง Windsor ตรง ใช้ key จาก localStorage
 const USE_PROXY = location.protocol === "http:" || location.protocol === "https:";
 const ENDPOINT = USE_PROXY ? "/api/windsor" : "https://connectors.windsor.ai/all";
-function wfetch(params, connector){
-  // timeout กันค้าง: ถ้าเกิน 45 วิให้ยกเลิก → เด้ง error แทนหมุนไม่จบ
+function wfetch(params, connector, timeoutMs){
+  // timeout กันค้าง: default 45 วิ (benchmark ช่วงยาวส่ง timeoutMs มากกว่านี้ได้)
   const ctrl = new AbortController();
-  const t = setTimeout(()=>ctrl.abort(), 45000);
+  const t = setTimeout(()=>ctrl.abort(), timeoutMs||45000);
   let p;
   if(USE_PROXY){
     // รันผ่าน server (Railway): ใช้ key จาก env `Windsor_key` ฝั่ง server เท่านั้น
@@ -1447,7 +1447,8 @@ let benchRaw=[], benchLoaded=false, benchFrom="2025-01-01", benchTo="";
 const benchFilter={objective:"",brand:"",material:""};
 
 // base field ที่ชัวร์ + ชุด result เสริม (best-effort, ไล่ fallback ถ้า Windsor ปฏิเสธ field)
-const BENCH_BASE="account_name,campaign,spend,impressions,reach,clicks,date";
+// ไม่ใส่ date → Windsor รวมยอดต่อแคมเปญให้เลย (แถวน้อยลงมาก เร็วขึ้น ไม่ timeout)
+const BENCH_BASE="account_name,campaign,spend,impressions,reach,clicks";
 const BENCH_OPT_TIERS=[
   "video_views,video_thruplay_watched_actions,post_engagement,inline_link_clicks,actions_add_to_cart,actions_purchase,actions_view_content,actions_onsite_conversion_messaging_conversation_started",
   "video_views,video_thruplay_watched_actions,post_engagement,inline_link_clicks",
@@ -1494,16 +1495,18 @@ async function loadBenchmark(){
     let data=null,lastStatus=0,lastBody="";
     for(const o of BENCH_OPT_TIERS){
       const f=BENCH_BASE+(o?","+o:"");
-      const res=await wfetch(`date_from=${from}&date_to=${to}&fields=${f}`,"facebook");
-      if(res.ok){ data=(await res.json()).data||[]; break; }
-      lastStatus=res.status; lastBody=(await res.text()).slice(0,200);
-      if([400,401,403].includes(lastStatus)&&/key|auth|token|unauthor|permission/i.test(lastBody)) break;
+      try{
+        const res=await wfetch(`date_from=${from}&date_to=${to}&fields=${f}`,"facebook",120000);
+        if(res.ok){ data=(await res.json()).data||[]; break; }
+        lastStatus=res.status; lastBody=(await res.text()).slice(0,200);
+        if([400,401,403].includes(lastStatus)&&/key|auth|token|unauthor|permission/i.test(lastBody)) break;
+      }catch(err){ lastBody=(err&&err.message)||String(err); }  // timeout/network → ลอง tier ถัดไป (field น้อยลง)
     }
-    if(data===null) throw new Error(`Windsor ปฏิเสธทุกชุด field (HTTP ${lastStatus}: ${lastBody||"—"})`);
+    if(data===null) throw new Error(`Windsor ไม่ตอบ/ปฏิเสธทุกชุด field (HTTP ${lastStatus}: ${lastBody||"—"}) — ลองลดช่วงวันที่ให้สั้นลง`);
     benchRaw=data.map(r=>{
       const p=parseCampaign(r.campaign);
       return { account:acctOf(r), campaign:r.campaign||"(ไม่ระบุแคมเปญ)",
-        brand:p.brand, objective:p.objective, material:p.material, date:r.date,
+        brand:p.brand, objective:p.objective, material:p.material,
         spend:+r.spend||0, impressions:+r.impressions||0, reach:+r.reach||0, clicks:+r.clicks||0,
         video:bnum(r,["video_views","video_view","actions_video_view"]),
         thruplay:bnum(r,["video_thruplay_watched_actions","thruplays","thruplay"]),
