@@ -76,30 +76,53 @@
   .reco-info{border-left-color:var(--gray)}
 
   /* ===== Ad Benchmark ===== */
-  .bench-filters{display:flex;gap:14px;flex-wrap:wrap;margin-bottom:18px}
-  .bench-filters label{display:flex;flex-direction:column;gap:5px;font-size:11px;font-weight:600;letter-spacing:.04em;text-transform:uppercase;color:var(--muted)}
-  .bench-filters select{min-width:200px;max-width:320px}
-  .bench-panel{margin-bottom:22px}
-  .bench-scroll{overflow:auto;max-height:440px}
-  .bench-scroll table{min-width:760px}
-  table.bench thead th{position:sticky;background:var(--surface);z-index:2}
+  .bench-filters{display:flex;gap:16px;flex-wrap:wrap;margin-bottom:20px}
+  .bench-filters label{display:flex;flex-direction:column;gap:6px;font-size:10.5px;font-weight:600;letter-spacing:.06em;text-transform:uppercase;color:var(--muted)}
+  .bench-filters select{min-width:210px;max-width:320px}
+  .bench-panel{margin-bottom:22px;box-shadow:0 1px 3px rgba(16,24,40,.05),0 1px 2px rgba(16,24,40,.03)}
+  .bench-count{color:var(--muted);font-size:12px;font-weight:500}
+
+  /* --- table shell --- */
+  .bench-scroll{overflow:auto;max-height:460px;border:1px solid var(--border);border-radius:10px;background:var(--surface)}
+  .bench-scroll::-webkit-scrollbar{height:11px;width:11px}
+  .bench-scroll::-webkit-scrollbar-thumb{background:#d3d7dc;border-radius:6px;border:3px solid var(--surface)}
+  .bench-scroll::-webkit-scrollbar-thumb:hover{background:#bcc1c7}
+  .bench-scroll table{min-width:760px;border-collapse:separate;border-spacing:0}
+  table.bench{font-size:12.5px}
+  table.bench th,table.bench td{padding:9px 13px;border:none;white-space:nowrap}
+  table.bench tbody td{border-top:1px solid #f1f2f4}
+
+  /* --- header (2 ชั้น) --- */
+  table.bench thead th{position:sticky;background:var(--well);z-index:2;font-family:'JetBrains Mono',monospace}
   table.bench thead tr:first-child th{top:0}
-  table.bench thead tr:nth-child(2) th{top:29px}
-  table.bench th{cursor:default}
-  table.bench th.grp{text-align:center;border-bottom:2px solid var(--border);color:var(--ink);font-size:11px}
-  table.bench td.num{text-align:right}
-  table.bench tbody tr.grand{border-top:2px solid var(--border);font-weight:700;background:var(--well)}
-  table.bench tbody tr.grand td{color:var(--ink)}
-  table.bench td.na{color:var(--gray)}
-  table.bench .gsep{border-left:2px solid #b9bdc2}
-  table.bench th,table.bench td{padding:7px 9px}
-  table.bench td.rn,table.bench th.rn{width:30px;text-align:right;color:var(--muted);font-size:11px}
-  table.bench td.txt{text-align:left}
-  table.bench td:not(.na){color:var(--ink)}
-  .bench-count{color:var(--muted);font-size:12px}
-  .bench-legend{font-size:12px;color:var(--muted);line-height:1.8;margin-top:2px}
+  table.bench thead tr:nth-child(2) th{top:35px}
+  table.bench th.grp{text-align:center;color:var(--ink);font-weight:700;font-size:11px;letter-spacing:.05em;text-transform:uppercase;padding:12px 13px 9px;border-bottom:1px solid var(--border)}
+  table.bench thead tr:nth-child(2) th{font-size:9.5px;font-weight:600;color:var(--muted);letter-spacing:.09em;padding:6px 13px;border-bottom:1px solid var(--border)}
+
+  /* --- body --- */
+  table.bench td.num{text-align:right;font-family:'JetBrains Mono',monospace;font-variant-numeric:tabular-nums;color:var(--ink)}
+  table.bench td.na{text-align:right;color:#cfd3d8}
+  table.bench td.txt{text-align:left;color:var(--text)}
+  table.bench tbody tr:hover td{background:var(--yellow-tint)}
+
+  /* --- # + Brand ตรึงซ้าย (freeze) --- */
+  table.bench .rn{width:38px;min-width:38px;text-align:right;color:var(--muted);font-size:11px;font-family:'JetBrains Mono',monospace;padding-left:9px;padding-right:6px}
+  table.bench .bcol{min-width:132px;text-align:left;font-family:'Work Sans','Noto Sans Thai',sans-serif;font-weight:600;color:var(--ink)}
+  table.bench th.rn,table.bench td.rn{position:sticky;left:0;z-index:3;background:var(--surface)}
+  table.bench th.bcol,table.bench td.bcol{position:sticky;left:38px;z-index:3;background:var(--surface);box-shadow:1px 0 0 var(--border)}
+  table.bench thead th.rn,table.bench thead th.bcol{z-index:5;background:var(--well)}
+  table.bench tbody tr:hover td.rn,table.bench tbody tr:hover td.bcol{background:var(--yellow-tint)}
+
+  /* --- เส้นแบ่งกลุ่ม metric --- */
+  table.bench .gsep{border-left:1px solid var(--border)}
+
+  /* --- grand total --- */
+  table.bench tbody tr.grand td{border-top:2px solid var(--border);font-weight:700;background:var(--well);color:var(--ink)}
+  table.bench tbody tr.grand:hover td{background:var(--well)}
+
+  .bench-legend{font-size:12px;color:var(--muted);line-height:1.9;margin-top:6px}
   .bench-legend b{color:var(--text);font-weight:600}
-  .bench-empty{padding:26px;text-align:center;color:var(--muted)}
+  .bench-empty{padding:44px;text-align:center;color:var(--muted)}
   .kpi{background:var(--surface);border:1px solid var(--border);border-radius:8px;padding:16px}
   .kpi.primary{border-left:4px solid var(--yellow)}
   .kpi .klabel{font-family:'JetBrains Mono',monospace;font-size:11px;font-weight:500;letter-spacing:.05em;color:var(--muted);text-transform:uppercase}
@@ -1658,9 +1681,9 @@ function renderBenchmark(){
   // heatmap: เขียว(ถูก) → แดง(แพง) ต่อคอลัมน์
   const heat=(v,range)=>{
     if(v==null||!v||!isFinite(v)||!range) return "";
-    if(range.max===range.min) return "background:hsl(140,55%,90%)";
+    if(range.max===range.min) return "background:hsl(145,52%,93%)";
     const t=Math.max(0,Math.min(1,(v-range.min)/(range.max-range.min)));
-    return `background:hsl(${Math.round(140-140*t)},62%,88%)`;
+    return `background:hsl(${Math.round(145-137*t)},58%,${92-t*3}%)`;
   };
   const hcell=(v,style,cls)=> (v==null||!v||!isFinite(v))?`<td class="na${cls||''}">—</td>`:`<td class="num${cls||''}" style="${style}">${money(v)}</td>`;
 
@@ -1670,10 +1693,10 @@ function renderBenchmark(){
     const ranges=metrics.map((m,mi)=>{ const r={}; subs.forEach(s=>{
       const vals=mx.map(x=>x.stats[mi]&&x.stats[mi][s]).filter(v=>v!=null&&v>0&&isFinite(v));
       r[s]=vals.length?{min:Math.min(...vals),max:Math.max(...vals)}:null; }); return r; });
-    let h=`<div class="bench-scroll"><table class="bench"><thead><tr><th rowspan="2" class="rn">#</th><th rowspan="2">Brand</th>`+metrics.map(m=>`<th class="grp gsep" colspan="4">${m.l}</th>`).join("")+`</tr><tr>`+metrics.map(()=>`<th class="gsep">Avg</th><th>Min</th><th>Max</th><th>Med</th>`).join("")+`</tr></thead><tbody>`;
-    mx.forEach((x,i)=>{ h+=`<tr><td class="rn">${i+1}</td><td>${x.b}</td>`+metrics.map((m,mi)=>subs.map((s,si)=>{ const st=x.stats[mi], gs=si===0?" gsep":""; return st?hcell(st[s],heat(st[s],ranges[mi][s]),gs):`<td class="na${gs}">—</td>`; }).join("")).join("")+`</tr>`; });
+    let h=`<div class="bench-scroll"><table class="bench"><thead><tr><th rowspan="2" class="rn">#</th><th rowspan="2" class="bcol">Brand</th>`+metrics.map(m=>`<th class="grp gsep" colspan="4">${m.l}</th>`).join("")+`</tr><tr>`+metrics.map(()=>`<th class="gsep">Avg</th><th>Min</th><th>Max</th><th>Med</th>`).join("")+`</tr></thead><tbody>`;
+    mx.forEach((x,i)=>{ h+=`<tr><td class="rn">${i+1}</td><td class="bcol">${x.b}</td>`+metrics.map((m,mi)=>subs.map((s,si)=>{ const st=x.stats[mi], gs=si===0?" gsep":""; return st?hcell(st[s],heat(st[s],ranges[mi][s]),gs):`<td class="na${gs}">—</td>`; }).join("")).join("")+`</tr>`; });
     const gq=metrics.map(m=>bstat(pick(camps,m).map(c=>c._cost[m.k])));
-    h+=`<tr class="grand"><td class="rn"></td><td>Grand total</td>`+gq.map(s=> s?`<td class="num gsep">${money(s.avg)}</td><td class="num">${money(s.min)}</td><td class="num">${money(s.max)}</td><td class="num">${money(s.med)}</td>`:'<td class="na gsep">—</td><td class="na">—</td><td class="na">—</td><td class="na">—</td>').join("")+`</tr>`;
+    h+=`<tr class="grand"><td class="rn"></td><td class="bcol">Grand total</td>`+gq.map(s=> s?`<td class="num gsep">${money(s.avg)}</td><td class="num">${money(s.min)}</td><td class="num">${money(s.max)}</td><td class="num">${money(s.med)}</td>`:'<td class="na gsep">—</td><td class="na">—</td><td class="na">—</td><td class="na">—</td>').join("")+`</tr>`;
     return h+`</tbody></table></div>`;
   };
 
