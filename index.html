@@ -1457,8 +1457,8 @@ const benchFilter={objective:"",brand:"",material:""};
 // ไม่ใส่ date → Windsor รวมยอดต่อแคมเปญให้เลย (แถวน้อยลงมาก เร็วขึ้น ไม่ timeout)
 const BENCH_BASE="account_name,campaign,spend,impressions,reach,clicks";
 const BENCH_OPT_TIERS=[
-  "video_views,video_thruplay_watched_actions,post_engagement,inline_link_clicks,actions_add_to_cart,actions_purchase,actions_view_content,actions_onsite_conversion_messaging_conversation_started",
-  "video_views,video_thruplay_watched_actions,post_engagement,inline_link_clicks",
+  "cost_per_action_type_video_view,cost_per_thruplay_video_view,cost_per_action_type_page_engagement,actions_add_to_cart,actions_purchase,actions_view_content,actions_onsite_conversion_messaging_conversation_started",
+  "cost_per_action_type_video_view,cost_per_thruplay_video_view,cost_per_action_type_page_engagement",
   "video_views,post_engagement",
   ""
 ];
@@ -1575,12 +1575,16 @@ async function loadBenchmark(){
     if(data===null) throw new Error(`Windsor ไม่ตอบ/ปฏิเสธทุกชุด field (HTTP ${lastStatus}: ${lastBody||"—"}) — ลองลดช่วงวันที่ให้สั้นลง`);
     benchRaw=data.map(r=>{
       const p=parseCampaign(r.campaign);
+      const sp=+r.spend||0;
+      // Windsor ให้ cost_per_* มาแล้ว → แปลงกลับเป็นจำนวน result (count = spend / cost_per)
+      // เพื่อรวมข้ามแถวได้ถูกต้อง (สุดท้าย cpv = Σspend / Σcount) ; ไม่มี → fallback raw count
+      const fromCost=(costKeys,rawKeys)=>{ const cp=bnum(r,costKeys); return cp>0 ? sp/cp : bnum(r,rawKeys); };
       return { account:acctOf(r), campaign:r.campaign||"(ไม่ระบุแคมเปญ)",
         brand:p.brand, objective:p.objective, material:p.material,
-        spend:+r.spend||0, impressions:+r.impressions||0, reach:+r.reach||0, clicks:+r.clicks||0,
-        video:bnum(r,["video_views","video_view","actions_video_view"]),
-        thruplay:bnum(r,["video_thruplay_watched_actions","thruplays","thruplay"]),
-        engage:bnum(r,["post_engagement","post_engagements","page_engagement"]),
+        spend:sp, impressions:+r.impressions||0, reach:+r.reach||0, clicks:+r.clicks||0,
+        video:fromCost(["cost_per_action_type_video_view"],["video_views","video_view","actions_video_view"]),
+        thruplay:fromCost(["cost_per_thruplay_video_view"],["video_thruplay_watched_actions","thruplays","thruplay"]),
+        engage:fromCost(["cost_per_action_type_page_engagement"],["post_engagement","post_engagements","page_engagement"]),
         msg:bnum(r,["actions_onsite_conversion_messaging_conversation_started","onsite_conversion_messaging_conversation_started","messaging_conversation_started_7d"]),
         atc:bnum(r,["actions_add_to_cart","add_to_cart"]),
         purchase:bnum(r,["actions_purchase","purchase","actions_omni_purchase"]),
