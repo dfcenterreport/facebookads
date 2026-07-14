@@ -373,6 +373,10 @@
       <button id="benchRefresh" class="btn-primary">↻ รีเฟรช</button>
     </div>
   </div>
+  <div class="pills" id="benchModeTabs" style="margin-bottom:18px">
+    <div class="pill active" data-m="cost">FB Cost per</div>
+    <div class="pill" data-m="rate">FB Result Rate</div>
+  </div>
   <div class="bench-filters">
     <label>Objective<select id="benchFObjective"><option value="">— ทั้งหมด —</option></select></label>
     <label>Brand name<select id="benchFBrand"><option value="">— ทั้งหมด —</option></select></label>
@@ -1477,7 +1481,7 @@ document.getElementById("backBtn").onclick=showLanding;
 /* ============================================================
    AD BENCHMARK — Cost per Result by Brand (parse จากชื่อแคมเปญ)
    ============================================================ */
-let benchRaw=[], benchLoaded=false, benchFrom="2025-01-01", benchTo="";
+let benchRaw=[], benchLoaded=false, benchFrom="2025-01-01", benchTo="", benchMode="cost";
 const benchFilter={objective:"",brand:"",material:""};
 
 // base field ที่ชัวร์ + ชุด result เสริม (best-effort, ไล่ fallback ถ้า Windsor ปฏิเสธ field)
@@ -1659,33 +1663,41 @@ function renderBenchmark(){
     METR.forEach(m=>c[m]+=r[m]);
   });
   const camps=Object.values(byCamp);
-  camps.forEach(c=>c._cost={
-    cpm:c.impressions?c.spend/c.impressions*1000:0, cpr:c.reach?c.spend/c.reach*1000:0,
+  camps.forEach(c=>{ const im=c.impressions; c._cost={
+    cpm:im?c.spend/im*1000:0, cpr:c.reach?c.spend/c.reach*1000:0,
     cpv:c.video?c.spend/c.video:0, cptp:c.thruplay?c.spend/c.thruplay:0,
     cpc:c.clicks?c.spend/c.clicks:0, cpe:c.engage?c.spend/c.engage:0,
     cpmsg:c.msg?c.spend/c.msg:0, cpvc:c.viewc?c.spend/c.viewc:0,
-    cpatc:c.atc?c.spend/c.atc:0, cppur:c.purchase?c.spend/c.purchase:0 });
+    cpatc:c.atc?c.spend/c.atc:0, cppur:c.purchase?c.spend/c.purchase:0,
+    // --- Result Rate (อัตราต่อ impressions) ---
+    vr3:im?c.video/im:0, vrtp:im?c.thruplay/im:0, ctr:im?c.clicks/im:0,
+    er:im?c.engage/im:0, freq:c.reach?im/c.reach:0, octr:0 /* Outbound CTR: ยังไม่มี field */ }; });
 
   const byBrand={}; camps.forEach(c=>{ (byBrand[c.brand]=byBrand[c.brand]||[]).push(c); });
   const brands=Object.keys(byBrand).sort((a,b)=>a.localeCompare(b));
-  const money=v=>v?"฿"+v.toLocaleString("en-US",{maximumFractionDigits:2}):null;
 
-  const MAIN=[{k:"cpm",l:"CPM"},{k:"cpr",l:"CPR / 1K reach"},{k:"cpv",l:"CPV"},{k:"cptp",l:"CP Thruplay"},{k:"cpc",l:"CPC"},{k:"cpe",l:"CPE"}];
-  const MSG=[{k:"cpmsg",l:"CP MSG",obj:"Message"},{k:"cpvc",l:"CP View Content",obj:"CPAS"},{k:"cpatc",l:"CP ATC",obj:"CPAS"},{k:"cppur",l:"CP Purchase",obj:"CPAS"}];
-  const cell=v=> (v==null||!v||!isFinite(v))?'<td class="na">—</td>':`<td class="num">${money(v)}</td>`;
+  // formatters
+  const fMoney=v=>"฿"+v.toLocaleString("en-US",{maximumFractionDigits:2});
+  const fPct=v=>(v*100).toFixed(2)+"%";
+  const fNum=v=>v.toLocaleString("en-US",{maximumFractionDigits:2});
 
-  // top 10 แบรนด์ (เรียงตาม spend รวม)
+  const MAIN=[{k:"cpm",l:"CPM",f:fMoney},{k:"cpr",l:"CPR / 1K reach",f:fMoney},{k:"cpv",l:"CPV",f:fMoney},{k:"cptp",l:"CP Thruplay",f:fMoney},{k:"cpc",l:"CPC",f:fMoney},{k:"cpe",l:"CPE",f:fMoney}];
+  const MSG=[{k:"cpmsg",l:"CP MSG",f:fMoney,obj:"Message"},{k:"cpvc",l:"CP View Content",f:fMoney,obj:"CPAS"},{k:"cpatc",l:"CP ATC",f:fMoney,obj:"CPAS"},{k:"cppur",l:"CP Purchase",f:fMoney,obj:"CPAS"}];
+  const RATE=[{k:"vr3",l:"VR% (3s)",f:fPct,hi:1},{k:"vrtp",l:"VR% (Thruplay)",f:fPct,hi:1},{k:"ctr",l:"CTR",f:fPct,hi:1},{k:"er",l:"ER%",f:fPct,hi:1},{k:"freq",l:"Frequency",f:fNum},{k:"octr",l:"Outbound CTR",f:fPct,hi:1}];
+  const cell=(v,f)=> (v==null||!v||!isFinite(v))?'<td class="na">—</td>':`<td class="num">${(f||fMoney)(v)}</td>`;
+
   const brandSpend=b=>byBrand[b].reduce((s,c)=>s+c.spend,0);
   const topBrands=[...brands].sort((a,b)=>brandSpend(b)-brandSpend(a));
   const subs=["avg","min","max","med"];
-  // heatmap: เขียว(ถูก) → แดง(แพง) ต่อคอลัมน์
-  const heat=(v,range)=>{
+  // heatmap ต่อคอลัมน์ — cost: ต่ำ=เขียว ; rate(hi): สูง=เขียว
+  const heat=(v,range,hi)=>{
     if(v==null||!v||!isFinite(v)||!range) return "";
     if(range.max===range.min) return "background:hsl(145,52%,93%)";
-    const t=Math.max(0,Math.min(1,(v-range.min)/(range.max-range.min)));
+    let t=Math.max(0,Math.min(1,(v-range.min)/(range.max-range.min)));
+    if(hi) t=1-t;
     return `background:hsl(${Math.round(145-137*t)},58%,${92-t*3}%)`;
   };
-  const hcell=(v,style,cls)=> (v==null||!v||!isFinite(v))?`<td class="na${cls||''}">—</td>`:`<td class="num${cls||''}" style="${style}">${money(v)}</td>`;
+  const hcell=(v,style,cls,f)=> (v==null||!v||!isFinite(v))?`<td class="na${cls||''}">—</td>`:`<td class="num${cls||''}" style="${style}">${(f||fMoney)(v)}</td>`;
 
   const brandTable=metrics=>{
     const pick=(list,m)=>list.filter(c=>!m.obj||c.objective===m.obj);  // บาง metric นับเฉพาะ objective ที่กำหนด
@@ -1694,19 +1706,44 @@ function renderBenchmark(){
       const vals=mx.map(x=>x.stats[mi]&&x.stats[mi][s]).filter(v=>v!=null&&v>0&&isFinite(v));
       r[s]=vals.length?{min:Math.min(...vals),max:Math.max(...vals)}:null; }); return r; });
     let h=`<div class="bench-scroll"><table class="bench"><thead><tr><th rowspan="2" class="rn">#</th><th rowspan="2" class="bcol">Brand</th>`+metrics.map(m=>`<th class="grp gsep" colspan="4">${m.l}</th>`).join("")+`</tr><tr>`+metrics.map(()=>`<th class="gsep">Avg</th><th>Min</th><th>Max</th><th>Med</th>`).join("")+`</tr></thead><tbody>`;
-    mx.forEach((x,i)=>{ h+=`<tr><td class="rn">${i+1}</td><td class="bcol">${x.b}</td>`+metrics.map((m,mi)=>subs.map((s,si)=>{ const st=x.stats[mi], gs=si===0?" gsep":""; return st?hcell(st[s],heat(st[s],ranges[mi][s]),gs):`<td class="na${gs}">—</td>`; }).join("")).join("")+`</tr>`; });
+    mx.forEach((x,i)=>{ h+=`<tr><td class="rn">${i+1}</td><td class="bcol">${x.b}</td>`+metrics.map((m,mi)=>subs.map((s,si)=>{ const st=x.stats[mi], gs=si===0?" gsep":""; return st?hcell(st[s],heat(st[s],ranges[mi][s],m.hi),gs,m.f):`<td class="na${gs}">—</td>`; }).join("")).join("")+`</tr>`; });
     const gq=metrics.map(m=>bstat(pick(camps,m).map(c=>c._cost[m.k])));
-    h+=`<tr class="grand"><td class="rn"></td><td class="bcol">Grand total</td>`+gq.map(s=> s?`<td class="num gsep">${money(s.avg)}</td><td class="num">${money(s.min)}</td><td class="num">${money(s.max)}</td><td class="num">${money(s.med)}</td>`:'<td class="na gsep">—</td><td class="na">—</td><td class="na">—</td><td class="na">—</td>').join("")+`</tr>`;
+    h+=`<tr class="grand"><td class="rn"></td><td class="bcol">Grand total</td>`+metrics.map((m,mi)=>{ const s=gq[mi]; return s?`<td class="num gsep">${m.f(s.avg)}</td><td class="num">${m.f(s.min)}</td><td class="num">${m.f(s.max)}</td><td class="num">${m.f(s.med)}</td>`:'<td class="na gsep">—</td><td class="na">—</td><td class="na">—</td><td class="na">—</td>'; }).join("")+`</tr>`;
     return h+`</tbody></table></div>`;
   };
 
   const campSorted=[...camps].sort((a,b)=>b.spend-a.spend);
+  const esc=s=>String(s).replace(/"/g,'&quot;');
+
+  if(benchMode==="rate"){
+    const campRows=campSorted.map((c,i)=>`<tr>
+      <td class="rn">${i+1}</td>
+      <td class="camp" title="${esc(c.campaign)}">${c.campaign}</td>
+      <td class="txt">${c.brand}</td><td class="camp">${c.material}</td>
+      <td class="num">${fmtMoney(c.spend)}</td>${cell(c._cost.vr3,fPct)}${cell(c._cost.vrtp,fPct)}${cell(c._cost.er,fPct)}${cell(c._cost.ctr,fPct)}</tr>`).join("");
+    cont.innerHTML=`
+      <div class="panel bench-panel">
+        <div class="panel-head"><h3>Result Rate by Brand</h3><span class="bench-count">${brands.length} แบรนด์ · ${camps.length} แคมเปญ · เลื่อนดูได้</span></div>
+        <div class="psub">🟢 สูง (ดี) → 🔴 ต่ำ · VR% / CTR / ER% = อัตราต่อ impressions · <b>Outbound CTR</b> ยังไม่ได้ตั้ง field (—)</div>
+        ${brandTable(RATE)}
+      </div>
+      <div class="panel bench-panel">
+        <div class="panel-head"><h3>Campaign</h3><span class="bench-count">${camps.length} แคมเปญ (เรียงตาม Spend · เลื่อนดูได้)</span></div>
+        <div class="bench-scroll"><table class="bench"><thead><tr>
+          <th class="rn">#</th><th>Campaign</th><th>Brand</th><th>Material type</th><th>Spend</th><th>Avg VR% 3s</th><th>Avg VR% Thruplay</th><th>Avg ER%</th><th>Avg CTR</th>
+        </tr></thead><tbody>${campRows}</tbody></table></div>
+      </div>
+      <div class="bench-legend">
+        * <b>VR% (3s)</b> = 3-sec video views ÷ impressions · <b>VR% (Thruplay)</b> = thruplays ÷ impressions · <b>ER%</b> = engagement ÷ impressions · <b>CTR</b> = clicks ÷ impressions · <b>Frequency</b> = impressions ÷ reach · <b>Outbound CTR</b> = ยังไม่ได้ตั้ง field
+      </div>`;
+    return;
+  }
+
   const campRows=campSorted.map((c,i)=>`<tr>
     <td class="rn">${i+1}</td>
-    <td class="camp" title="${c.campaign.replace(/"/g,'&quot;')}">${c.campaign}</td>
+    <td class="camp" title="${esc(c.campaign)}">${c.campaign}</td>
     <td class="txt">${c.brand}</td><td class="txt">${c.objective}</td><td class="camp">${c.material}</td>
     <td class="num">${fmtMoney(c.spend)}</td>${cell(c._cost.cpm)}${cell(c._cost.cpv)}</tr>`).join("");
-
   cont.innerHTML=`
     <div class="panel bench-panel">
       <div class="panel-head"><h3>Cost Per Result by Brand</h3><span class="bench-count">${brands.length} แบรนด์ · ${camps.length} แคมเปญ · เลื่อนดูได้</span></div>
@@ -1766,6 +1803,12 @@ document.getElementById("benchApply").onclick=()=>{
   if(!f||!t){ alert("กรุณาเลือกทั้งวันเริ่มต้นและวันสิ้นสุด"); return; }
   if(f>t){ alert("วันเริ่มต้นต้องไม่เกินวันสิ้นสุด"); return; }
   benchFrom=f; benchTo=t; benchLoaded=false; loadBenchmark();
+};
+document.getElementById("benchModeTabs").onclick=e=>{
+  const p=e.target.closest(".pill"); if(!p) return;
+  document.querySelectorAll("#benchModeTabs .pill").forEach(x=>x.classList.remove("active"));
+  p.classList.add("active"); benchMode=p.dataset.m;
+  if(benchLoaded) renderBenchmark(); else loadBenchmark();
 };
 document.getElementById("benchFObjective").onchange=e=>{ benchFilter.objective=e.target.value; renderBenchmark(); };
 document.getElementById("benchFBrand").onchange=e=>{ benchFilter.brand=e.target.value; renderBenchmark(); };
