@@ -1488,6 +1488,23 @@ const OBJ_RULES=[
 ];
 function detectObjective(str){ for(const [re,o] of OBJ_RULES){ if(re.test(str)) return o; } return "(ไม่ระบุ)"; }
 
+// Material type: ตรวจว่าชื่อ contain keyword ไหน → ชื่อมาตรฐาน (ตัวแรกที่ match ชนะ)
+const MAT_RULES=[
+  [/7\.5\s*(?:s|sec)/i,"VDO 7.5s"],
+  [/\b6\s*(?:s|sec)\b/i,"VDO 6s"],
+  [/\b10\s*(?:s|sec)\b/i,"VDO 10s"],
+  [/\b15\s*(?:s|sec)\b/i,"VDO 15s"],
+  [/\b30\s*(?:s|sec)\b/i,"VDO 30s"],
+  [/\b45\s*(?:s|sec)\b/i,"VDO 45s"],
+  [/(?:>|over|เกิน|มากกว่า)\s*3\s*min|3\s*\+\s*min/i,"VDO >3 Mins"],
+  [/\b1\s*min/i,"VDO 1 Mins"],
+  [/single\s*image/i,"Single Image"],
+  [/photo\s*album/i,"Photo Album"],
+  [/catalog/i,"Catalog Ads"],
+  [/carousel/i,"Carousel"]
+];
+function detectMaterial(str){ for(const [re,m] of MAT_RULES){ if(re.test(str)) return m; } return "(ไม่ระบุ)"; }
+
 function parseCampaign(name){
   const s=String(name||"");
   const core=s.split(" / ")[0];                              // ตัด "/ segment" ท้าย
@@ -1500,10 +1517,8 @@ function parseCampaign(name){
   let objective="(ไม่ระบุ)", objIdx=-1;
   for(let i=0;i<segs.length;i++){ const o=detectObjective(segs[i]); if(o!=="(ไม่ระบุ)"){ objective=o; objIdx=i; break; } }
   if(objIdx<0) objective=detectObjective(core);
-  // material: segment ถัดจาก objective ; ไม่งั้น segment สุดท้าย
-  let material="(ไม่ระบุ)";
-  if(objIdx>=0 && segs[objIdx+1]) material=segs[objIdx+1];
-  else if(segs.length>=2) material=segs[segs.length-1];
+  // material: ตรวจ contain keyword ตามลิสต์มาตรฐาน (ไม่ใช่ตามตำแหน่ง)
+  const material=detectMaterial(noTail);
   const projectName=segs[0]||"";
   return {brand:normalizeBrand(core,projectName), objective, material};
 }
