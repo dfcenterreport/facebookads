@@ -74,6 +74,21 @@
   .reco-warn{border-left-color:#e0a800}
   .reco-bad{border-left-color:var(--bad)}
   .reco-info{border-left-color:var(--gray)}
+
+  /* ===== Ad Benchmark ===== */
+  .bench-filters{display:flex;gap:14px;flex-wrap:wrap;margin-bottom:18px}
+  .bench-filters label{display:flex;flex-direction:column;gap:5px;font-size:11px;font-weight:600;letter-spacing:.04em;text-transform:uppercase;color:var(--muted)}
+  .bench-filters select{min-width:200px;max-width:320px}
+  .bench-panel{margin-bottom:22px}
+  .bench-scroll{overflow-x:auto}
+  .bench-scroll table{min-width:760px}
+  table.bench th{cursor:default}
+  table.bench th.grp{text-align:center;border-bottom:2px solid var(--border);color:var(--ink);font-size:11px}
+  table.bench td.num{text-align:right}
+  table.bench tbody tr.grand{border-top:2px solid var(--border);font-weight:700;background:var(--well)}
+  table.bench tbody tr.grand td{color:var(--ink)}
+  table.bench td.na{color:var(--gray)}
+  .bench-empty{padding:26px;text-align:center;color:var(--muted)}
   .kpi{background:var(--surface);border:1px solid var(--border);border-radius:8px;padding:16px}
   .kpi.primary{border-left:4px solid var(--yellow)}
   .kpi .klabel{font-family:'JetBrains Mono',monospace;font-size:11px;font-weight:500;letter-spacing:.05em;color:var(--muted);text-transform:uppercase}
@@ -226,6 +241,7 @@
   <div class="topnav-tabs">
     <div class="topnav-tab active" data-view="app">Dashboard</div>
     <div class="topnav-tab" data-view="biddable">Creative Report</div>
+    <div class="topnav-tab" data-view="benchmark">Ad Benchmark</div>
     <div class="topnav-tab" data-view="activeacct">Active Ad account</div>
   </div>
 </nav>
@@ -304,6 +320,31 @@
     </div>
   </div>
   <div id="bidContent"><div class="loading">กำลังดึงข้อมูลจาก Windsor…</div></div>
+</section>
+
+<!-- ===================== AD BENCHMARK ===================== -->
+<section id="benchmarkView" style="display:none">
+  <div class="bid-head">
+    <div>
+      <h1>📊 Ad <span class="accent">Benchmark</span></h1>
+      <div class="sub" id="benchRangeLabel">ต้นทุนต่อผลลัพธ์ (Cost per Result) แยกตามแบรนด์ · ดึงข้อมูลตั้งแต่ 2025</div>
+    </div>
+    <div class="controls">
+      <div class="range">
+        <input type="date" id="benchFrom" title="วันเริ่มต้น">
+        <span class="rdash">–</span>
+        <input type="date" id="benchTo" title="วันสิ้นสุด">
+        <button id="benchApply">ใช้</button>
+      </div>
+      <button id="benchRefresh" class="btn-primary">↻ รีเฟรช</button>
+    </div>
+  </div>
+  <div class="bench-filters">
+    <label>Objective<select id="benchFObjective"><option value="">— ทั้งหมด —</option></select></label>
+    <label>Brand name<select id="benchFBrand"><option value="">— ทั้งหมด —</option></select></label>
+    <label>Material type<select id="benchFMaterial"><option value="">— ทั้งหมด —</option></select></label>
+  </div>
+  <div id="benchmarkContent"><div class="loading">กำลังดึงข้อมูลจาก Windsor…</div></div>
 </section>
 
 <!-- ===================== ACTIVE AD ACCOUNT ===================== -->
@@ -1399,7 +1440,170 @@ document.getElementById("keyBtnLanding").onclick=()=>{ if(ensureKey(true)){ land
 if(USE_PROXY){ ["keyBtn","keyBtnLanding"].forEach(id=>{ const b=document.getElementById(id); if(b) b.style.display="none"; }); }
 document.getElementById("backBtn").onclick=showLanding;
 
-const SIDE_VIEWS=["biddable","activeacct"];
+/* ============================================================
+   AD BENCHMARK — Cost per Result by Brand (parse จากชื่อแคมเปญ)
+   ============================================================ */
+let benchRaw=[], benchLoaded=false, benchFrom="2025-01-01", benchTo="";
+const benchFilter={objective:"",brand:"",material:""};
+
+// base field ที่ชัวร์ + ชุด result เสริม (best-effort, ไล่ fallback ถ้า Windsor ปฏิเสธ field)
+const BENCH_BASE="account_name,campaign,spend,impressions,reach,clicks,date";
+const BENCH_OPT_TIERS=[
+  "video_views,video_thruplay_watched_actions,post_engagement,inline_link_clicks,actions_add_to_cart,actions_purchase,actions_view_content,actions_onsite_conversion_messaging_conversation_started",
+  "video_views,video_thruplay_watched_actions,post_engagement,inline_link_clicks",
+  "video_views,post_engagement",
+  ""
+];
+
+// ---- Brand: parse Project Name แล้ว normalize ให้ชื่อตรงกัน ----
+// เพิ่ม/แก้แบรนด์ได้ที่นี่ (แบบเดียวกับ CASE WHEN REGEXP_MATCH ของ Looker) — ตัวแรกที่ match ชนะ
+const BRAND_RULES=[
+  [/bissin/i,"Bissin"], [/dutch\s?mill/i,"Dutchmill"], [/systema/i,"Systema"],
+  [/\bmama\b/i,"Mama"], [/suesat/i,"Suesat"], [/puriku/i,"Puriku"], [/i-?kids/i,"I-Kids"],
+  [/falles/i,"Falles"], [/kodomo/i,"Kodomo"], [/shokubutsu/i,"Shokubutsu"], [/\bpao\b/i,"Pao"],
+  [/\bzact\b/i,"Zact"], [/kirei/i,"Kirei"], [/lipon/i,"Lipon F"], [/mont\s?fle/i,"Mont Fleur"],
+  [/hajiko/i,"Hajiko"], [/farm\s?house/i,"Farmhouse"], [/honest/i,"Honest"], [/kewpie/i,"Kewpie"],
+  [/hashi/i,"Hashi"], [/hi-?class/i,"HiClass"], [/de\s?paris/i,"De Paris"], [/fresh/i,"Fresh &"]
+];
+function normalizeBrand(full, projectName){
+  const s=String(full||"");
+  for(const [re,name] of BRAND_RULES){ if(re.test(s)) return name; }
+  const tok=String(projectName||"").trim().split(/\s+/)[0];   // fallback: คำแรกของ Project Name
+  return tok||"(ไม่ระบุ)";
+}
+function parseCampaign(name){
+  const s=String(name||"");
+  const core=s.split(" / ")[0];                              // ตัด "/ segment" ท้าย
+  const afterCode=core.replace(/^[^\[]*\[[^\]]*\]\s*/,"");    // ตัด "Bid [code] " (ถ้ามี)
+  const noTail=afterCode.replace(/\s*\[[^\]]*\]/g,"")          // ตัด [date]
+                        .replace(/\s*\([^)]*\)\s*$/,"")         // ตัด (job) ท้าย
+                        .trim();
+  const parts=noTail.split(" - ");
+  const projectName=(parts[0]||"").trim();
+  const objective=(parts[1]||"").trim()||"(ไม่ระบุ)";
+  const material=(parts.slice(2).join(" - ")||"").trim()||"(ไม่ระบุ)";
+  return {brand:normalizeBrand(core,projectName), objective, material};
+}
+function bnum(r, keys){ for(const k of keys){ const v=r[k]; if(v!=null&&v!=="") return +v||0; } return 0; }
+
+async function loadBenchmark(){
+  if(!ensureKey(false)){ document.getElementById("benchmarkContent").innerHTML='<div class="error">ยังไม่มี API key — กดปุ่ม 🔑 Key</div>'; return; }
+  const from=benchFrom, to=benchTo||new Date().toISOString().slice(0,10);
+  document.getElementById("benchmarkContent").innerHTML=`<div class="loading">กำลังดึงข้อมูลจาก Windsor… (${from} → ${to})</div>`;
+  try{
+    let data=null,lastStatus=0,lastBody="";
+    for(const o of BENCH_OPT_TIERS){
+      const f=BENCH_BASE+(o?","+o:"");
+      const res=await wfetch(`date_from=${from}&date_to=${to}&fields=${f}`,"facebook");
+      if(res.ok){ data=(await res.json()).data||[]; break; }
+      lastStatus=res.status; lastBody=(await res.text()).slice(0,200);
+      if([400,401,403].includes(lastStatus)&&/key|auth|token|unauthor|permission/i.test(lastBody)) break;
+    }
+    if(data===null) throw new Error(`Windsor ปฏิเสธทุกชุด field (HTTP ${lastStatus}: ${lastBody||"—"})`);
+    benchRaw=data.map(r=>{
+      const p=parseCampaign(r.campaign);
+      return { account:acctOf(r), campaign:r.campaign||"(ไม่ระบุแคมเปญ)",
+        brand:p.brand, objective:p.objective, material:p.material, date:r.date,
+        spend:+r.spend||0, impressions:+r.impressions||0, reach:+r.reach||0, clicks:+r.clicks||0,
+        video:bnum(r,["video_views","video_view","actions_video_view"]),
+        thruplay:bnum(r,["video_thruplay_watched_actions","thruplays","thruplay"]),
+        engage:bnum(r,["post_engagement","post_engagements","page_engagement"]),
+        msg:bnum(r,["actions_onsite_conversion_messaging_conversation_started","onsite_conversion_messaging_conversation_started","messaging_conversation_started_7d"]),
+        atc:bnum(r,["actions_add_to_cart","add_to_cart"]),
+        purchase:bnum(r,["actions_purchase","purchase","actions_omni_purchase"]),
+        viewc:bnum(r,["actions_view_content","view_content","content_views"]) };
+    });
+    benchLoaded=true;
+    document.getElementById("benchRangeLabel").textContent=`Cost per Result แยกตามแบรนด์ · ${from} → ${to} · ${benchRaw.length} แถว`;
+    populateBenchFilters();
+    renderBenchmark();
+  }catch(e){
+    document.getElementById("benchmarkContent").innerHTML=`<div class="error">❌ โหลด benchmark ไม่สำเร็จ: ${e.message}</div>`;
+  }
+}
+
+function populateBenchFilters(){
+  const uniq=arr=>[...new Set(arr)].filter(x=>x&&x!=="(ไม่ระบุ)").sort((a,b)=>a.localeCompare(b));
+  const fill=(id,vals,cur)=>{
+    const sel=document.getElementById(id); if(!sel) return;
+    sel.innerHTML='<option value="">— ทั้งหมด —</option>'+vals.map(v=>`<option value="${String(v).replace(/"/g,'&quot;')}"${v===cur?' selected':''}>${v}</option>`).join("");
+  };
+  fill("benchFObjective",uniq(benchRaw.map(r=>r.objective)),benchFilter.objective);
+  fill("benchFBrand",uniq(benchRaw.map(r=>r.brand)),benchFilter.brand);
+  fill("benchFMaterial",uniq(benchRaw.map(r=>r.material)),benchFilter.material);
+}
+
+function bstat(arr){
+  const a=arr.filter(x=>x>0&&isFinite(x)).sort((x,y)=>x-y);
+  if(!a.length) return null;
+  const sum=a.reduce((s,x)=>s+x,0), mid=Math.floor(a.length/2);
+  return {avg:sum/a.length,min:a[0],max:a[a.length-1],med:a.length%2?a[mid]:(a[mid-1]+a[mid])/2};
+}
+
+function renderBenchmark(){
+  const rows=benchRaw.filter(r=>
+    (!benchFilter.objective||r.objective===benchFilter.objective)&&
+    (!benchFilter.brand||r.brand===benchFilter.brand)&&
+    (!benchFilter.material||r.material===benchFilter.material));
+  const cont=document.getElementById("benchmarkContent");
+  if(!rows.length){ cont.innerHTML='<div class="bench-empty">ไม่พบข้อมูลตามตัวกรองที่เลือก</div>'; return; }
+
+  const METR=["spend","impressions","reach","clicks","video","thruplay","engage","msg","atc","purchase","viewc"];
+  const byCamp={};
+  rows.forEach(r=>{
+    const c=byCamp[r.campaign]||(byCamp[r.campaign]={campaign:r.campaign,brand:r.brand,objective:r.objective,material:r.material,spend:0,impressions:0,reach:0,clicks:0,video:0,thruplay:0,engage:0,msg:0,atc:0,purchase:0,viewc:0});
+    METR.forEach(m=>c[m]+=r[m]);
+  });
+  const camps=Object.values(byCamp);
+  camps.forEach(c=>c._cost={
+    cpm:c.impressions?c.spend/c.impressions*1000:0, cpr:c.reach?c.spend/c.reach*1000:0,
+    cpv:c.video?c.spend/c.video:0, cptp:c.thruplay?c.spend/c.thruplay:0,
+    cpc:c.clicks?c.spend/c.clicks:0, cpe:c.engage?c.spend/c.engage:0,
+    cpmsg:c.msg?c.spend/c.msg:0, cpvc:c.viewc?c.spend/c.viewc:0,
+    cpatc:c.atc?c.spend/c.atc:0, cppur:c.purchase?c.spend/c.purchase:0 });
+
+  const byBrand={}; camps.forEach(c=>{ (byBrand[c.brand]=byBrand[c.brand]||[]).push(c); });
+  const brands=Object.keys(byBrand).sort((a,b)=>a.localeCompare(b));
+  const money=v=>v?"฿"+v.toLocaleString("en-US",{maximumFractionDigits:2}):null;
+
+  const MAIN=[{k:"cpm",l:"CPM"},{k:"cpr",l:"CPR / 1K reach"},{k:"cpv",l:"CPV"},{k:"cptp",l:"CP Thruplay"},{k:"cpc",l:"CPC"},{k:"cpe",l:"CPE"}];
+  const MSG=[{k:"cpmsg",l:"CP MSG"},{k:"cpvc",l:"CP View Content"},{k:"cpatc",l:"CP ATC"},{k:"cppur",l:"CP Purchase"}];
+  const cell=v=> (v==null||!v||!isFinite(v))?'<td class="na">—</td>':`<td class="num">${money(v)}</td>`;
+  const quad=list=>metric=>{ const s=bstat(list.map(c=>c._cost[metric])); return s?cell(s.avg)+cell(s.min)+cell(s.max)+cell(s.med):cell(null)+cell(null)+cell(null)+cell(null); };
+
+  const brandTable=metrics=>{
+    let h=`<div class="bench-scroll"><table class="bench"><thead><tr><th rowspan="2">Brand</th>`+metrics.map(m=>`<th class="grp" colspan="4">${m.l}</th>`).join("")+`</tr><tr>`+metrics.map(()=>`<th>Avg</th><th>Min</th><th>Max</th><th>Med</th>`).join("")+`</tr></thead><tbody>`;
+    brands.forEach(b=>{ const q=quad(byBrand[b]); h+=`<tr><td>${b}</td>`+metrics.map(m=>q(m.k)).join("")+`</tr>`; });
+    const gq=quad(camps); h+=`<tr class="grand"><td>Grand total</td>`+metrics.map(m=>gq(m.k)).join("")+`</tr>`;
+    return h+`</tbody></table></div>`;
+  };
+
+  const campSorted=[...camps].sort((a,b)=>b.spend-a.spend);
+  const campRows=campSorted.map(c=>`<tr>
+    <td class="camp" title="${c.campaign.replace(/"/g,'&quot;')}">${c.campaign}</td>
+    <td>${c.brand}</td><td>${c.objective}</td><td class="camp">${c.material}</td>
+    <td class="num">${fmtMoney(c.spend)}</td>${cell(c._cost.cpm)}${cell(c._cost.cpv)}</tr>`).join("");
+
+  cont.innerHTML=`
+    <div class="panel bench-panel">
+      <div class="panel-head"><h3>Cost Per Result by Brand</h3><span style="color:var(--muted);font-size:12px">${brands.length} แบรนด์ · ${camps.length} แคมเปญ</span></div>
+      <div class="psub">คำนวณต้นทุนต่อผลลัพธ์รายแคมเปญ แล้วสรุป Avg / Min / Max / Med ต่อแบรนด์ · — = Windsor ไม่มีข้อมูล field นั้น</div>
+      ${brandTable(MAIN)}
+    </div>
+    <div class="panel bench-panel">
+      <div class="panel-head"><h3>Cost Per Result by Brand (Message &amp; CPAS)</h3></div>
+      <div class="psub">เมตริก messaging / catalog (add-to-cart, purchase, view content)</div>
+      ${brandTable(MSG)}
+    </div>
+    <div class="panel bench-panel">
+      <div class="panel-head"><h3>Campaign</h3><span style="color:var(--muted);font-size:12px">${camps.length} แคมเปญ</span></div>
+      <div class="bench-scroll"><table class="bench"><thead><tr>
+        <th>Campaign</th><th>Brand</th><th>Objective</th><th>Material type</th><th>Spend</th><th>CPM</th><th>CPV</th>
+      </tr></thead><tbody>${campRows}</tbody></table></div>
+    </div>`;
+}
+
+const SIDE_VIEWS=["biddable","benchmark","activeacct"];
 let viewBeforeSide="landing";
 document.getElementById("topNav").onclick=e=>{
   const t=e.target.closest(".topnav-tab"); if(!t) return;
@@ -1414,12 +1618,33 @@ document.getElementById("topNav").onclick=e=>{
     if(view==="activeacct" && !activeAcctData.length) loadActiveAccounts();
     if(view==="activeacct" && !acctMonthlyLoaded) loadMonthlyTrend();
     if(view==="biddable" && !bidLoaded) loadBiddable();
+    if(view==="benchmark" && !benchLoaded) loadBenchmark();
   }else{
     SIDE_VIEWS.forEach(v=>document.getElementById(v+"View").style.display="none");
     if(viewBeforeSide==="dashboard") document.getElementById("dashboardView").style.display="block";
     else showLanding();
   }
 };
+
+/* ---- Ad Benchmark: filters, date range, refresh ---- */
+(function(){
+  const today=new Date().toISOString().slice(0,10);
+  benchTo=today;
+  const fEl=document.getElementById("benchFrom"), tEl=document.getElementById("benchTo");
+  if(fEl) fEl.value=benchFrom;
+  if(tEl) tEl.value=today;
+})();
+document.getElementById("benchRefresh").onclick=()=>{ benchLoaded=false; loadBenchmark(); };
+document.getElementById("benchApply").onclick=()=>{
+  const f=document.getElementById("benchFrom").value, t=document.getElementById("benchTo").value;
+  if(!f||!t){ alert("กรุณาเลือกทั้งวันเริ่มต้นและวันสิ้นสุด"); return; }
+  if(f>t){ alert("วันเริ่มต้นต้องไม่เกินวันสิ้นสุด"); return; }
+  benchFrom=f; benchTo=t; benchLoaded=false; loadBenchmark();
+};
+document.getElementById("benchFObjective").onchange=e=>{ benchFilter.objective=e.target.value; renderBenchmark(); };
+document.getElementById("benchFBrand").onchange=e=>{ benchFilter.brand=e.target.value; renderBenchmark(); };
+document.getElementById("benchFMaterial").onchange=e=>{ benchFilter.material=e.target.value; renderBenchmark(); };
+
 showLanding();
 </script>
 </body>
