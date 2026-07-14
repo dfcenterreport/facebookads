@@ -88,6 +88,13 @@
   table.bench tbody tr.grand{border-top:2px solid var(--border);font-weight:700;background:var(--well)}
   table.bench tbody tr.grand td{color:var(--ink)}
   table.bench td.na{color:var(--gray)}
+  table.bench th,table.bench td{padding:7px 9px}
+  table.bench td.rn,table.bench th.rn{width:30px;text-align:right;color:var(--muted);font-size:11px}
+  table.bench td.txt{text-align:left}
+  table.bench td:not(.na){color:var(--ink)}
+  .bench-count{color:var(--muted);font-size:12px}
+  .bench-legend{font-size:12px;color:var(--muted);line-height:1.8;margin-top:2px}
+  .bench-legend b{color:var(--text);font-weight:600}
   .bench-empty{padding:26px;text-align:center;color:var(--muted)}
   .kpi{background:var(--surface);border:1px solid var(--border);border-radius:8px;padding:16px}
   .kpi.primary{border-left:4px solid var(--yellow)}
@@ -1572,37 +1579,59 @@ function renderBenchmark(){
   const MAIN=[{k:"cpm",l:"CPM"},{k:"cpr",l:"CPR / 1K reach"},{k:"cpv",l:"CPV"},{k:"cptp",l:"CP Thruplay"},{k:"cpc",l:"CPC"},{k:"cpe",l:"CPE"}];
   const MSG=[{k:"cpmsg",l:"CP MSG"},{k:"cpvc",l:"CP View Content"},{k:"cpatc",l:"CP ATC"},{k:"cppur",l:"CP Purchase"}];
   const cell=v=> (v==null||!v||!isFinite(v))?'<td class="na">—</td>':`<td class="num">${money(v)}</td>`;
-  const quad=list=>metric=>{ const s=bstat(list.map(c=>c._cost[metric])); return s?cell(s.avg)+cell(s.min)+cell(s.max)+cell(s.med):cell(null)+cell(null)+cell(null)+cell(null); };
+
+  // top 10 แบรนด์ (เรียงตาม spend รวม)
+  const brandSpend=b=>byBrand[b].reduce((s,c)=>s+c.spend,0);
+  const topBrands=[...brands].sort((a,b)=>brandSpend(b)-brandSpend(a)).slice(0,10);
+  const subs=["avg","min","max","med"];
+  // heatmap: เขียว(ถูก) → แดง(แพง) ต่อคอลัมน์
+  const heat=(v,range)=>{
+    if(v==null||!v||!isFinite(v)||!range) return "";
+    if(range.max===range.min) return "background:hsl(140,55%,90%)";
+    const t=Math.max(0,Math.min(1,(v-range.min)/(range.max-range.min)));
+    return `background:hsl(${Math.round(140-140*t)},62%,88%)`;
+  };
+  const hcell=(v,style)=> (v==null||!v||!isFinite(v))?'<td class="na">—</td>':`<td class="num" style="${style}">${money(v)}</td>`;
 
   const brandTable=metrics=>{
-    let h=`<div class="bench-scroll"><table class="bench"><thead><tr><th rowspan="2">Brand</th>`+metrics.map(m=>`<th class="grp" colspan="4">${m.l}</th>`).join("")+`</tr><tr>`+metrics.map(()=>`<th>Avg</th><th>Min</th><th>Max</th><th>Med</th>`).join("")+`</tr></thead><tbody>`;
-    brands.forEach(b=>{ const q=quad(byBrand[b]); h+=`<tr><td>${b}</td>`+metrics.map(m=>q(m.k)).join("")+`</tr>`; });
-    const gq=quad(camps); h+=`<tr class="grand"><td>Grand total</td>`+metrics.map(m=>gq(m.k)).join("")+`</tr>`;
+    const mx=topBrands.map(b=>({b,stats:metrics.map(m=>bstat(byBrand[b].map(c=>c._cost[m.k])))}));
+    const ranges=metrics.map((m,mi)=>{ const r={}; subs.forEach(s=>{
+      const vals=mx.map(x=>x.stats[mi]&&x.stats[mi][s]).filter(v=>v!=null&&v>0&&isFinite(v));
+      r[s]=vals.length?{min:Math.min(...vals),max:Math.max(...vals)}:null; }); return r; });
+    let h=`<div class="bench-scroll"><table class="bench"><thead><tr><th rowspan="2" class="rn">#</th><th rowspan="2">Brand</th>`+metrics.map(m=>`<th class="grp" colspan="4">${m.l}</th>`).join("")+`</tr><tr>`+metrics.map(()=>`<th>Avg</th><th>Min</th><th>Max</th><th>Med</th>`).join("")+`</tr></thead><tbody>`;
+    mx.forEach((x,i)=>{ h+=`<tr><td class="rn">${i+1}</td><td>${x.b}</td>`+metrics.map((m,mi)=>subs.map(s=>{ const st=x.stats[mi]; return st?hcell(st[s],heat(st[s],ranges[mi][s])):'<td class="na">—</td>'; }).join("")).join("")+`</tr>`; });
+    const gq=metrics.map(m=>bstat(camps.map(c=>c._cost[m.k])));
+    h+=`<tr class="grand"><td class="rn"></td><td>Grand total</td>`+gq.map(s=> s?`<td class="num">${money(s.avg)}</td><td class="num">${money(s.min)}</td><td class="num">${money(s.max)}</td><td class="num">${money(s.med)}</td>`:'<td class="na">—</td>'.repeat(4)).join("")+`</tr>`;
     return h+`</tbody></table></div>`;
   };
 
-  const campSorted=[...camps].sort((a,b)=>b.spend-a.spend);
-  const campRows=campSorted.map(c=>`<tr>
+  const campSorted=[...camps].sort((a,b)=>b.spend-a.spend).slice(0,10);
+  const campRows=campSorted.map((c,i)=>`<tr>
+    <td class="rn">${i+1}</td>
     <td class="camp" title="${c.campaign.replace(/"/g,'&quot;')}">${c.campaign}</td>
-    <td>${c.brand}</td><td>${c.objective}</td><td class="camp">${c.material}</td>
+    <td class="txt">${c.brand}</td><td class="txt">${c.objective}</td><td class="camp">${c.material}</td>
     <td class="num">${fmtMoney(c.spend)}</td>${cell(c._cost.cpm)}${cell(c._cost.cpv)}</tr>`).join("");
 
+  const topNote=n=>`Top ${Math.min(10,n)} จาก ${n}`;
   cont.innerHTML=`
     <div class="panel bench-panel">
-      <div class="panel-head"><h3>Cost Per Result by Brand</h3><span style="color:var(--muted);font-size:12px">${brands.length} แบรนด์ · ${camps.length} แคมเปญ</span></div>
-      <div class="psub">คำนวณต้นทุนต่อผลลัพธ์รายแคมเปญ แล้วสรุป Avg / Min / Max / Med ต่อแบรนด์ · — = Windsor ไม่มีข้อมูล field นั้น</div>
+      <div class="panel-head"><h3>Cost Per Result by Brand</h3><span class="bench-count">${topNote(brands.length)} แบรนด์ · ${camps.length} แคมเปญ</span></div>
+      <div class="psub">🟢 ถูก → 🔴 แพง (ไล่สีต่อคอลัมน์) · สรุป Avg / Min / Max / Med ต่อแบรนด์ · — = Windsor ไม่มีข้อมูล</div>
       ${brandTable(MAIN)}
     </div>
     <div class="panel bench-panel">
-      <div class="panel-head"><h3>Cost Per Result by Brand (Message &amp; CPAS)</h3></div>
+      <div class="panel-head"><h3>Cost Per Result by Brand (Message &amp; CPAS)</h3><span class="bench-count">${topNote(brands.length)} แบรนด์</span></div>
       <div class="psub">เมตริก messaging / catalog (add-to-cart, purchase, view content)</div>
       ${brandTable(MSG)}
     </div>
     <div class="panel bench-panel">
-      <div class="panel-head"><h3>Campaign</h3><span style="color:var(--muted);font-size:12px">${camps.length} แคมเปญ</span></div>
+      <div class="panel-head"><h3>Campaign</h3><span class="bench-count">${topNote(camps.length)} แคมเปญ (เรียงตาม Spend)</span></div>
       <div class="bench-scroll"><table class="bench"><thead><tr>
-        <th>Campaign</th><th>Brand</th><th>Objective</th><th>Material type</th><th>Spend</th><th>CPM</th><th>CPV</th>
+        <th class="rn">#</th><th>Campaign</th><th>Brand</th><th>Objective</th><th>Material type</th><th>Spend</th><th>CPM</th><th>CPV</th>
       </tr></thead><tbody>${campRows}</tbody></table></div>
+    </div>
+    <div class="bench-legend">
+      * <b>CP MSG</b> = Cost per Message · <b>CPVC</b> = Cost per View Content (CPAS) · <b>CP ATC</b> = Cost per Add to Cart (CPAS) · <b>CP Purchase</b> = Cost per Purchase (CPAS) · <b>CPR</b> = ต้นทุนต่อ 1,000 reach · <b>AN</b> = Audience Network
     </div>`;
 }
 
