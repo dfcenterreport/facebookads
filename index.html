@@ -91,6 +91,7 @@
   table.bench tbody tr.grand{border-top:2px solid var(--border);font-weight:700;background:var(--well)}
   table.bench tbody tr.grand td{color:var(--ink)}
   table.bench td.na{color:var(--gray)}
+  table.bench .gsep{border-left:2px solid #b9bdc2}
   table.bench th,table.bench td{padding:7px 9px}
   table.bench td.rn,table.bench th.rn{width:30px;text-align:right;color:var(--muted);font-size:11px}
   table.bench td.txt{text-align:left}
@@ -1661,7 +1662,7 @@ function renderBenchmark(){
     const t=Math.max(0,Math.min(1,(v-range.min)/(range.max-range.min)));
     return `background:hsl(${Math.round(140-140*t)},62%,88%)`;
   };
-  const hcell=(v,style)=> (v==null||!v||!isFinite(v))?'<td class="na">—</td>':`<td class="num" style="${style}">${money(v)}</td>`;
+  const hcell=(v,style,cls)=> (v==null||!v||!isFinite(v))?`<td class="na${cls||''}">—</td>`:`<td class="num${cls||''}" style="${style}">${money(v)}</td>`;
 
   const brandTable=metrics=>{
     const pick=(list,m)=>list.filter(c=>!m.obj||c.objective===m.obj);  // บาง metric นับเฉพาะ objective ที่กำหนด
@@ -1669,10 +1670,10 @@ function renderBenchmark(){
     const ranges=metrics.map((m,mi)=>{ const r={}; subs.forEach(s=>{
       const vals=mx.map(x=>x.stats[mi]&&x.stats[mi][s]).filter(v=>v!=null&&v>0&&isFinite(v));
       r[s]=vals.length?{min:Math.min(...vals),max:Math.max(...vals)}:null; }); return r; });
-    let h=`<div class="bench-scroll"><table class="bench"><thead><tr><th rowspan="2" class="rn">#</th><th rowspan="2">Brand</th>`+metrics.map(m=>`<th class="grp" colspan="4">${m.l}</th>`).join("")+`</tr><tr>`+metrics.map(()=>`<th>Avg</th><th>Min</th><th>Max</th><th>Med</th>`).join("")+`</tr></thead><tbody>`;
-    mx.forEach((x,i)=>{ h+=`<tr><td class="rn">${i+1}</td><td>${x.b}</td>`+metrics.map((m,mi)=>subs.map(s=>{ const st=x.stats[mi]; return st?hcell(st[s],heat(st[s],ranges[mi][s])):'<td class="na">—</td>'; }).join("")).join("")+`</tr>`; });
+    let h=`<div class="bench-scroll"><table class="bench"><thead><tr><th rowspan="2" class="rn">#</th><th rowspan="2">Brand</th>`+metrics.map(m=>`<th class="grp gsep" colspan="4">${m.l}</th>`).join("")+`</tr><tr>`+metrics.map(()=>`<th class="gsep">Avg</th><th>Min</th><th>Max</th><th>Med</th>`).join("")+`</tr></thead><tbody>`;
+    mx.forEach((x,i)=>{ h+=`<tr><td class="rn">${i+1}</td><td>${x.b}</td>`+metrics.map((m,mi)=>subs.map((s,si)=>{ const st=x.stats[mi], gs=si===0?" gsep":""; return st?hcell(st[s],heat(st[s],ranges[mi][s]),gs):`<td class="na${gs}">—</td>`; }).join("")).join("")+`</tr>`; });
     const gq=metrics.map(m=>bstat(pick(camps,m).map(c=>c._cost[m.k])));
-    h+=`<tr class="grand"><td class="rn"></td><td>Grand total</td>`+gq.map(s=> s?`<td class="num">${money(s.avg)}</td><td class="num">${money(s.min)}</td><td class="num">${money(s.max)}</td><td class="num">${money(s.med)}</td>`:'<td class="na">—</td>'.repeat(4)).join("")+`</tr>`;
+    h+=`<tr class="grand"><td class="rn"></td><td>Grand total</td>`+gq.map(s=> s?`<td class="num gsep">${money(s.avg)}</td><td class="num">${money(s.min)}</td><td class="num">${money(s.max)}</td><td class="num">${money(s.med)}</td>`:'<td class="na gsep">—</td><td class="na">—</td><td class="na">—</td><td class="na">—</td>').join("")+`</tr>`;
     return h+`</tbody></table></div>`;
   };
 
