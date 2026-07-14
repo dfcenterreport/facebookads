@@ -377,6 +377,7 @@
   <div class="pills" id="benchModeTabs" style="margin-bottom:18px">
     <div class="pill active" data-m="cost">FB Cost per</div>
     <div class="pill" data-m="rate">FB Result Rate</div>
+    <div class="pill" data-m="ttcost">TT Cost per</div>
   </div>
   <div class="bench-filters">
     <label>Objective<select id="benchFObjective"><option value="">— ทั้งหมด —</option></select></label>
@@ -1483,7 +1484,9 @@ document.getElementById("backBtn").onclick=showLanding;
    AD BENCHMARK — Cost per Result by Brand (parse จากชื่อแคมเปญ)
    ============================================================ */
 let benchRaw=[], benchLoaded=false, benchFrom="2025-01-01", benchTo="", benchMode="cost";
+let benchRawTT=[], benchTTLoaded=false;   // TikTok data
 const benchFilter={objective:"",brand:"",material:""};
+function benchActive(){ return benchMode==="ttcost" ? benchRawTT : benchRaw; }
 
 // base field ที่ชัวร์ + ชุด result เสริม (best-effort, ไล่ fallback ถ้า Windsor ปฏิเสธ field)
 // ไม่ใส่ date → Windsor รวมยอดต่อแคมเปญให้เลย (แถวน้อยลงมาก เร็วขึ้น ไม่ timeout)
@@ -1637,9 +1640,49 @@ function populateBenchFilters(){
     const sel=document.getElementById(id); if(!sel) return;
     sel.innerHTML='<option value="">— ทั้งหมด —</option>'+vals.map(v=>`<option value="${String(v).replace(/"/g,'&quot;')}"${v===cur?' selected':''}>${v}</option>`).join("");
   };
-  fill("benchFObjective",uniq(benchRaw.map(r=>r.objective)),benchFilter.objective);
-  fill("benchFBrand",uniq(benchRaw.map(r=>r.brand)),benchFilter.brand);
-  fill("benchFMaterial",uniq(benchRaw.map(r=>r.material)),benchFilter.material);
+  const src=benchActive();
+  fill("benchFObjective",uniq(src.map(r=>r.objective)),benchFilter.objective);
+  fill("benchFBrand",uniq(src.map(r=>r.brand)),benchFilter.brand);
+  fill("benchFMaterial",uniq(src.map(r=>r.material)),benchFilter.material);
+}
+
+// ---- TikTok: ดึงจาก connector "tiktok" (field ชุดพื้นฐาน + fallback) ----
+const TT_TIERS=[
+  "campaign,campaign_name,spend,impressions,reach,clicks",
+  "campaign,spend,impressions,reach,clicks",
+  "campaign_name,spend,impressions,reach,clicks",
+  "campaign,spend,impressions,clicks",
+  "campaign_name,spend,impressions,clicks"
+];
+async function loadBenchmarkTT(){
+  if(!ensureKey(false)){ document.getElementById("benchmarkContent").innerHTML='<div class="error">ยังไม่มี API key — กดปุ่ม 🔑 Key</div>'; return; }
+  const from=benchFrom, to=benchTo||new Date().toISOString().slice(0,10);
+  document.getElementById("benchmarkContent").innerHTML=`<div class="loading">กำลังดึงข้อมูล TikTok จาก Windsor… (${from} → ${to})</div>`;
+  try{
+    let data=null,lastStatus=0,lastBody="";
+    for(const f of TT_TIERS){
+      try{
+        const res=await wfetch(`date_from=${from}&date_to=${to}&fields=${f}`,"tiktok",120000);
+        if(res.ok){ data=(await res.json()).data||[]; break; }
+        lastStatus=res.status; lastBody=(await res.text()).slice(0,200);
+        if([400,401,403].includes(lastStatus)&&/key|auth|token|unauthor|permission/i.test(lastBody)) break;
+      }catch(err){ lastBody=(err&&err.message)||String(err); }
+    }
+    if(data===null) throw new Error(`Windsor (tiktok) ไม่ตอบ/ปฏิเสธทุกชุด field (HTTP ${lastStatus}: ${lastBody||"—"})`);
+    benchRawTT=data.map(r=>{
+      const name=r.campaign||r.campaign_name||"(ไม่ระบุแคมเปญ)";
+      const p=parseCampaign(name);
+      return { campaign:name, brand:p.brand, objective:p.objective, material:p.material,
+        spend:+r.spend||0, impressions:+r.impressions||0, reach:+r.reach||0, clicks:+r.clicks||0,
+        video:0, thruplay:0, engage:0, msg:0, atc:0, purchase:0, viewc:0 };
+    });
+    benchTTLoaded=true;
+    document.getElementById("benchRangeLabel").textContent=`TikTok Cost per Result · ${from} → ${to} · ${benchRawTT.length} แถว`;
+    populateBenchFilters();
+    renderBenchmark();
+  }catch(e){
+    document.getElementById("benchmarkContent").innerHTML=`<div class="error">❌ โหลด TikTok benchmark ไม่สำเร็จ: ${e.message}</div>`;
+  }
 }
 
 function bstat(arr){
@@ -1650,7 +1693,7 @@ function bstat(arr){
 }
 
 function renderBenchmark(){
-  const rows=benchRaw.filter(r=>
+  const rows=benchActive().filter(r=>
     (!benchFilter.objective||r.objective===benchFilter.objective)&&
     (!benchFilter.brand||r.brand===benchFilter.brand)&&
     (!benchFilter.material||r.material===benchFilter.material));
@@ -1685,6 +1728,8 @@ function renderBenchmark(){
   const MAIN=[{k:"cpm",l:"CPM",f:fMoney},{k:"cpr",l:"CPR / 1K reach",f:fMoney},{k:"cpv",l:"CPV",f:fMoney},{k:"cptp",l:"CP Thruplay",f:fMoney},{k:"cpc",l:"CPC",f:fMoney},{k:"cpe",l:"CPE",f:fMoney}];
   const MSG=[{k:"cpmsg",l:"CP MSG",f:fMoney,obj:"Message"},{k:"cpvc",l:"CP View Content",f:fMoney,obj:"CPAS"},{k:"cpatc",l:"CP ATC",f:fMoney,obj:"CPAS"},{k:"cppur",l:"CP Purchase",f:fMoney,obj:"CPAS"}];
   const RATE=[{k:"vr3",l:"VR% (3s)",f:fPct,hi:1},{k:"vrtp",l:"VR% (Thruplay)",f:fPct,hi:1},{k:"ctr",l:"CTR",f:fPct,hi:1},{k:"er",l:"ER%",f:fPct,hi:1},{k:"freq",l:"Frequency",f:fNum},{k:"octr",l:"Outbound CTR",f:fPct,hi:1}];
+  const TT_MAIN=[{k:"cpm",l:"CPM",f:fMoney},{k:"cpr",l:"CPR / 1K reach",f:fMoney},{k:"cpc",l:"CPC",f:fMoney},{k:"freq",l:"Frequency",f:fNum}];
+  const TT_VIDEO=[{k:"cpv",l:"CPV",f:fMoney},{k:"cpv6",l:"CPV (6s)",f:fMoney},{k:"cpv15",l:"CPV (15s)",f:fMoney}];
   const cell=(v,f)=> (v==null||!v||!isFinite(v))?'<td class="na">—</td>':`<td class="num">${(f||fMoney)(v)}</td>`;
 
   const brandSpend=b=>byBrand[b].reduce((s,c)=>s+c.spend,0);
@@ -1715,6 +1760,35 @@ function renderBenchmark(){
 
   const campSorted=[...camps].sort((a,b)=>b.spend-a.spend);
   const esc=s=>String(s).replace(/"/g,'&quot;');
+
+  if(benchMode==="ttcost"){
+    const campRows=campSorted.map((c,i)=>`<tr>
+      <td class="rn">${i+1}</td>
+      <td class="camp" title="${esc(c.campaign)}">${c.campaign}</td>
+      <td class="txt">${c.brand}</td><td class="camp">${c.material}</td>
+      <td class="num">${fmtMoney(c.spend)}</td>${cell(c._cost.cpm)}${cell(c._cost.cpc)}</tr>`).join("");
+    cont.innerHTML=`
+      <div class="panel bench-panel">
+        <div class="panel-head"><h3>Cost Per Result by Brand — TikTok</h3><span class="bench-count">${brands.length} แบรนด์ · ${camps.length} แคมเปญ · เลื่อนดูได้</span></div>
+        <div class="psub">🟢 ถูก → 🔴 แพง · CPM / CPR / CPC / Frequency (จาก spend · impressions · reach · clicks ของ TikTok)</div>
+        ${brandTable(TT_MAIN)}
+      </div>
+      <div class="panel bench-panel">
+        <div class="panel-head"><h3>Cost Per Result by Brand — Video (TikTok)</h3><span class="bench-count">${brands.length} แบรนด์</span></div>
+        <div class="psub">⚠️ CPV / CPV (6s) / CPV (15s) — ยังไม่ได้ตั้ง field ของ TikTok (—) รอยืนยันชื่อ metric</div>
+        ${brandTable(TT_VIDEO)}
+      </div>
+      <div class="panel bench-panel">
+        <div class="panel-head"><h3>Campaign — TikTok</h3><span class="bench-count">${camps.length} แคมเปญ (เรียงตาม Spend · เลื่อนดูได้)</span></div>
+        <div class="bench-scroll"><table class="bench"><thead><tr>
+          <th class="rn">#</th><th>Campaign</th><th>Brand</th><th>Material type</th><th>Spend</th><th>CPM</th><th>CPC</th>
+        </tr></thead><tbody>${campRows}</tbody></table></div>
+      </div>
+      <div class="bench-legend">
+        * TikTok · <b>CPM</b> = spend ÷ impressions ×1000 · <b>CPR</b> = spend ÷ 1,000 reach · <b>CPC</b> = spend ÷ clicks · <b>Frequency</b> = impressions ÷ reach · CPV ต่างๆ รอ field
+      </div>`;
+    return;
+  }
 
   if(benchMode==="rate"){
     const campRows=campSorted.map((c,i)=>`<tr>
@@ -1782,7 +1856,7 @@ document.getElementById("topNav").onclick=e=>{
     if(view==="activeacct" && !activeAcctData.length) loadActiveAccounts();
     if(view==="activeacct" && !acctMonthlyLoaded) loadMonthlyTrend();
     if(view==="biddable" && !bidLoaded) loadBiddable();
-    if(view==="benchmark" && !benchLoaded) loadBenchmark();
+    if(view==="benchmark"){ const isTT=benchMode==="ttcost"; if(isTT&&!benchTTLoaded) loadBenchmarkTT(); else if(!isTT&&!benchLoaded) loadBenchmark(); }
   }else{
     SIDE_VIEWS.forEach(v=>document.getElementById(v+"View").style.display="none");
     if(viewBeforeSide==="dashboard") document.getElementById("dashboardView").style.display="block";
@@ -1809,7 +1883,11 @@ document.getElementById("benchModeTabs").onclick=e=>{
   const p=e.target.closest(".pill"); if(!p) return;
   document.querySelectorAll("#benchModeTabs .pill").forEach(x=>x.classList.remove("active"));
   p.classList.add("active"); benchMode=p.dataset.m;
-  if(benchLoaded) renderBenchmark(); else loadBenchmark();
+  benchFilter.objective=benchFilter.brand=benchFilter.material="";   // reset ตัวกรองตอนสลับแหล่งข้อมูล
+  const isTT=benchMode==="ttcost";
+  if(isTT && !benchTTLoaded){ loadBenchmarkTT(); return; }
+  if(!isTT && !benchLoaded){ loadBenchmark(); return; }
+  populateBenchFilters(); renderBenchmark();
 };
 document.getElementById("benchFObjective").onchange=e=>{ benchFilter.objective=e.target.value; renderBenchmark(); };
 document.getElementById("benchFBrand").onchange=e=>{ benchFilter.brand=e.target.value; renderBenchmark(); };
