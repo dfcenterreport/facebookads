@@ -80,8 +80,11 @@
   .bench-filters label{display:flex;flex-direction:column;gap:5px;font-size:11px;font-weight:600;letter-spacing:.04em;text-transform:uppercase;color:var(--muted)}
   .bench-filters select{min-width:200px;max-width:320px}
   .bench-panel{margin-bottom:22px}
-  .bench-scroll{overflow-x:auto}
+  .bench-scroll{overflow:auto;max-height:440px}
   .bench-scroll table{min-width:760px}
+  table.bench thead th{position:sticky;background:var(--surface);z-index:2}
+  table.bench thead tr:first-child th{top:0}
+  table.bench thead tr:nth-child(2) th{top:29px}
   table.bench th{cursor:default}
   table.bench th.grp{text-align:center;border-bottom:2px solid var(--border);color:var(--ink);font-size:11px}
   table.bench td.num{text-align:right}
@@ -1649,7 +1652,7 @@ function renderBenchmark(){
 
   // top 10 แบรนด์ (เรียงตาม spend รวม)
   const brandSpend=b=>byBrand[b].reduce((s,c)=>s+c.spend,0);
-  const topBrands=[...brands].sort((a,b)=>brandSpend(b)-brandSpend(a)).slice(0,10);
+  const topBrands=[...brands].sort((a,b)=>brandSpend(b)-brandSpend(a));
   const subs=["avg","min","max","med"];
   // heatmap: เขียว(ถูก) → แดง(แพง) ต่อคอลัมน์
   const heat=(v,range)=>{
@@ -1672,27 +1675,26 @@ function renderBenchmark(){
     return h+`</tbody></table></div>`;
   };
 
-  const campSorted=[...camps].sort((a,b)=>b.spend-a.spend).slice(0,10);
+  const campSorted=[...camps].sort((a,b)=>b.spend-a.spend);
   const campRows=campSorted.map((c,i)=>`<tr>
     <td class="rn">${i+1}</td>
     <td class="camp" title="${c.campaign.replace(/"/g,'&quot;')}">${c.campaign}</td>
     <td class="txt">${c.brand}</td><td class="txt">${c.objective}</td><td class="camp">${c.material}</td>
     <td class="num">${fmtMoney(c.spend)}</td>${cell(c._cost.cpm)}${cell(c._cost.cpv)}</tr>`).join("");
 
-  const topNote=n=>`Top ${Math.min(10,n)} จาก ${n}`;
   cont.innerHTML=`
     <div class="panel bench-panel">
-      <div class="panel-head"><h3>Cost Per Result by Brand</h3><span class="bench-count">${topNote(brands.length)} แบรนด์ · ${camps.length} แคมเปญ</span></div>
+      <div class="panel-head"><h3>Cost Per Result by Brand</h3><span class="bench-count">${brands.length} แบรนด์ · ${camps.length} แคมเปญ · เลื่อนดูได้</span></div>
       <div class="psub">🟢 ถูก → 🔴 แพง (ไล่สีต่อคอลัมน์) · สรุป Avg / Min / Max / Med ต่อแบรนด์ · — = Windsor ไม่มีข้อมูล</div>
       ${brandTable(MAIN)}
     </div>
     <div class="panel bench-panel">
-      <div class="panel-head"><h3>Cost Per Result by Brand (Message &amp; CPAS)</h3><span class="bench-count">${topNote(brands.length)} แบรนด์</span></div>
+      <div class="panel-head"><h3>Cost Per Result by Brand (Message &amp; CPAS)</h3><span class="bench-count">${brands.length} แบรนด์ · เลื่อนดูได้</span></div>
       <div class="psub">เมตริก messaging / catalog (add-to-cart, purchase, view content)</div>
       ${brandTable(MSG)}
     </div>
     <div class="panel bench-panel">
-      <div class="panel-head"><h3>Campaign</h3><span class="bench-count">${topNote(camps.length)} แคมเปญ (เรียงตาม Spend)</span></div>
+      <div class="panel-head"><h3>Campaign</h3><span class="bench-count">${camps.length} แคมเปญ (เรียงตาม Spend · เลื่อนดูได้)</span></div>
       <div class="bench-scroll"><table class="bench"><thead><tr>
         <th class="rn">#</th><th>Campaign</th><th>Brand</th><th>Objective</th><th>Material type</th><th>Spend</th><th>CPM</th><th>CPV</th>
       </tr></thead><tbody>${campRows}</tbody></table></div>
