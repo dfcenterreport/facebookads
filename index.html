@@ -1460,7 +1460,7 @@ const benchFilter={objective:"",brand:"",material:""};
 // ไม่ใส่ date → Windsor รวมยอดต่อแคมเปญให้เลย (แถวน้อยลงมาก เร็วขึ้น ไม่ timeout)
 const BENCH_BASE="account_name,campaign,spend,impressions,reach,clicks";
 const BENCH_OPT_TIERS=[
-  "cost_per_action_type_video_view,cost_per_thruplay_video_view,cost_per_action_type_page_engagement,actions_add_to_cart,actions_purchase,actions_view_content,actions_onsite_conversion_messaging_conversation_started",
+  "cost_per_action_type_video_view,cost_per_thruplay_video_view,cost_per_action_type_page_engagement,actions_omni_add_to_cart,actions_omni_purchase,actions_omni_view_content,actions_onsite_conversion_messaging_conversation_started_7d",
   "cost_per_action_type_video_view,cost_per_thruplay_video_view,cost_per_action_type_page_engagement",
   "video_views,post_engagement",
   ""
@@ -1588,10 +1588,10 @@ async function loadBenchmark(){
         video:fromCost(["cost_per_action_type_video_view"],["video_views","video_view","actions_video_view"]),
         thruplay:fromCost(["cost_per_thruplay_video_view"],["video_thruplay_watched_actions","thruplays","thruplay"]),
         engage:fromCost(["cost_per_action_type_page_engagement"],["post_engagement","post_engagements","page_engagement"]),
-        msg:bnum(r,["actions_onsite_conversion_messaging_conversation_started","onsite_conversion_messaging_conversation_started","messaging_conversation_started_7d"]),
-        atc:bnum(r,["actions_add_to_cart","add_to_cart"]),
-        purchase:bnum(r,["actions_purchase","purchase","actions_omni_purchase"]),
-        viewc:bnum(r,["actions_view_content","view_content","content_views"]) };
+        msg:bnum(r,["actions_onsite_conversion_messaging_conversation_started_7d","actions_onsite_conversion_messaging_conversation_started"]),
+        atc:bnum(r,["actions_omni_add_to_cart","actions_add_to_cart"]),
+        purchase:bnum(r,["actions_omni_purchase","actions_purchase"]),
+        viewc:bnum(r,["actions_omni_view_content","actions_view_content"]) };
     });
     benchLoaded=true;
     document.getElementById("benchRangeLabel").textContent=`Cost per Result แยกตามแบรนด์ · ${from} → ${to} · ${benchRaw.length} แถว`;
