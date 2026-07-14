@@ -1647,7 +1647,7 @@ function renderBenchmark(){
   const money=v=>v?"฿"+v.toLocaleString("en-US",{maximumFractionDigits:2}):null;
 
   const MAIN=[{k:"cpm",l:"CPM"},{k:"cpr",l:"CPR / 1K reach"},{k:"cpv",l:"CPV"},{k:"cptp",l:"CP Thruplay"},{k:"cpc",l:"CPC"},{k:"cpe",l:"CPE"}];
-  const MSG=[{k:"cpmsg",l:"CP MSG"},{k:"cpvc",l:"CP View Content"},{k:"cpatc",l:"CP ATC"},{k:"cppur",l:"CP Purchase"}];
+  const MSG=[{k:"cpmsg",l:"CP MSG",obj:"Message"},{k:"cpvc",l:"CP View Content",obj:"CPAS"},{k:"cpatc",l:"CP ATC",obj:"CPAS"},{k:"cppur",l:"CP Purchase",obj:"CPAS"}];
   const cell=v=> (v==null||!v||!isFinite(v))?'<td class="na">—</td>':`<td class="num">${money(v)}</td>`;
 
   // top 10 แบรนด์ (เรียงตาม spend รวม)
@@ -1664,13 +1664,14 @@ function renderBenchmark(){
   const hcell=(v,style)=> (v==null||!v||!isFinite(v))?'<td class="na">—</td>':`<td class="num" style="${style}">${money(v)}</td>`;
 
   const brandTable=metrics=>{
-    const mx=topBrands.map(b=>({b,stats:metrics.map(m=>bstat(byBrand[b].map(c=>c._cost[m.k])))}));
+    const pick=(list,m)=>list.filter(c=>!m.obj||c.objective===m.obj);  // บาง metric นับเฉพาะ objective ที่กำหนด
+    const mx=topBrands.map(b=>({b,stats:metrics.map(m=>bstat(pick(byBrand[b],m).map(c=>c._cost[m.k])))}));
     const ranges=metrics.map((m,mi)=>{ const r={}; subs.forEach(s=>{
       const vals=mx.map(x=>x.stats[mi]&&x.stats[mi][s]).filter(v=>v!=null&&v>0&&isFinite(v));
       r[s]=vals.length?{min:Math.min(...vals),max:Math.max(...vals)}:null; }); return r; });
     let h=`<div class="bench-scroll"><table class="bench"><thead><tr><th rowspan="2" class="rn">#</th><th rowspan="2">Brand</th>`+metrics.map(m=>`<th class="grp" colspan="4">${m.l}</th>`).join("")+`</tr><tr>`+metrics.map(()=>`<th>Avg</th><th>Min</th><th>Max</th><th>Med</th>`).join("")+`</tr></thead><tbody>`;
     mx.forEach((x,i)=>{ h+=`<tr><td class="rn">${i+1}</td><td>${x.b}</td>`+metrics.map((m,mi)=>subs.map(s=>{ const st=x.stats[mi]; return st?hcell(st[s],heat(st[s],ranges[mi][s])):'<td class="na">—</td>'; }).join("")).join("")+`</tr>`; });
-    const gq=metrics.map(m=>bstat(camps.map(c=>c._cost[m.k])));
+    const gq=metrics.map(m=>bstat(pick(camps,m).map(c=>c._cost[m.k])));
     h+=`<tr class="grand"><td class="rn"></td><td>Grand total</td>`+gq.map(s=> s?`<td class="num">${money(s.avg)}</td><td class="num">${money(s.min)}</td><td class="num">${money(s.max)}</td><td class="num">${money(s.med)}</td>`:'<td class="na">—</td>'.repeat(4)).join("")+`</tr>`;
     return h+`</tbody></table></div>`;
   };
@@ -1690,7 +1691,7 @@ function renderBenchmark(){
     </div>
     <div class="panel bench-panel">
       <div class="panel-head"><h3>Cost Per Result by Brand (Message &amp; CPAS)</h3><span class="bench-count">${brands.length} แบรนด์ · เลื่อนดูได้</span></div>
-      <div class="psub">เมตริก messaging / catalog (add-to-cart, purchase, view content)</div>
+      <div class="psub">⚠️ <b>Remark:</b> CP MSG นับเฉพาะแคมเปญ Objective = <b>Message</b> · CP View Content / CP ATC / CP Purchase นับเฉพาะ Objective = <b>CPAS</b> (แบรนด์ที่ไม่มีแคมเปญตรงเงื่อนไขจะขึ้น —)</div>
       ${brandTable(MSG)}
     </div>
     <div class="panel bench-panel">
