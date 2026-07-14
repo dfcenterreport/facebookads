@@ -1481,10 +1481,19 @@ function normalizeBrand(full, projectName){
 }
 // Objective ตรวจด้วย keyword (ทนต่อชื่อหลายรูปแบบ) — ตัวแรกที่ match ชนะ
 const OBJ_RULES=[
-  [/video\s*thruplay|thruplay/i,"Video Thruplay"], [/video\s*views?/i,"Video Views"],
-  [/\breach\b/i,"Reach"], [/\btraffic\b/i,"Traffic"], [/page\s*likes?|pagelike/i,"Page Likes"],
-  [/\bengagement\b/i,"Engagement"], [/\bawareness\b/i,"Awareness"], [/\bcpas\b/i,"CPAS"],
-  [/\bmessages?\b/i,"Messages"], [/\bleads?\b/i,"Leads"], [/conversion|purchase|sales/i,"Conversions"]
+  [/thruplay/i,"Video Thruplay"],
+  [/video\s*views?/i,"Video Views"],
+  [/\breach\b/i,"Reach"],
+  [/engagement/i,"Engagement"],
+  [/\btraffic\b/i,"Traffic"],
+  [/\bcpas\b/i,"CPAS"],
+  [/conversion|\bsales\b/i,"Conversions"],
+  [/page\s*like/i,"Page Like"],
+  [/lead/i,"Lead Gen"],
+  [/message/i,"Message"],
+  [/app\s*install/i,"App Installs"],
+  [/awareness/i,"Awareness"],
+  [/event\s*response/i,"Event responses"]
 ];
 function detectObjective(str){ for(const [re,o] of OBJ_RULES){ if(re.test(str)) return o; } return "(ไม่ระบุ)"; }
 
