@@ -1466,18 +1466,42 @@ const BENCH_OPT_TIERS=[
 // ---- Brand: parse Project Name แล้ว normalize ให้ชื่อตรงกัน ----
 // เพิ่ม/แก้แบรนด์ได้ที่นี่ (แบบเดียวกับ CASE WHEN REGEXP_MATCH ของ Looker) — ตัวแรกที่ match ชนะ
 const BRAND_RULES=[
-  [/bissin/i,"Bissin"], [/dutch\s?mil/i,"Dutchmill"], [/systema/i,"Systema"],
-  [/\bmama\b/i,"Mama"], [/suesat/i,"Suesat"], [/puriku/i,"Puriku"], [/i-?kids/i,"I-Kids"],
-  [/falles/i,"Falles"], [/kodomo/i,"Kodomo"], [/shokubutsu/i,"Shokubutsu"], [/\bpao\b/i,"Pao"],
-  [/\bzact\b/i,"Zact"], [/kirei/i,"Kirei"], [/lipon/i,"Lipon F"], [/mont\s?fle/i,"Mont Fleur"],
-  [/hajiko/i,"Hajiko"], [/farm\s?house/i,"Farmhouse"], [/honest/i,"Honest"], [/kewpie/i,"Kewpie"],
-  [/hashi/i,"Hashi"], [/hi-?class/i,"HiClass"], [/de\s?paris/i,"De Paris"], [/fresh/i,"Fresh &"]
+  // conflict-prone / multi-word ก่อน
+  [/squid\s?brand|squidbrand|plara\s?paradise/i,"SquidBrand"],
+  [/bangchak|\bbgm\b/i,"Bangchak"],
+  [/108\s*(?:shop|detergent)/i,"108 Shop Detergent"],
+  [/pro[-\s]?detergent/i,"Pro Detergent"],
+  [/suesat/i,"Suesat Detergent"],
+  [/freshy/i,"Freshy"],
+  [/fresh\s*(?:&|and)?\s*soft/i,"Fresh & Soft"],
+  [/free\s*(?:&|and)?\s*free/i,"Free & Free"],
+  [/hi[-\s]?herb/i,"Hi-Herb"],
+  [/hi[-\s]?class/i,"HiClass"],
+  [/smart\s?heart/i,"Smartheart gold"],
+  [/mont\s?fle/i,"Mont Fleur"],
+  [/asia\s?drug/i,"Asia Drug"],
+  [/honest/i,"Honest Society"],
+  [/crying\s?thaiger|thaiger/i,"Crying Thaiger"],
+  [/good\s?age/i,"GoodAge"],
+  [/i[-\s]?kids/i,"I-Kids Pops"],
+  [/i[-\s]?snack/i,"ISnack"],
+  [/de\s?paris/i,"De Paris"],
+  [/lipon/i,"Lipon F"],
+  // ที่เหลือ (ชื่อเฉพาะ)
+  [/systema/i,"Systema"], [/\bmama\b/i,"Mama"], [/puriku/i,"Puriku"], [/falles/i,"Falles"],
+  [/essence/i,"Essence"], [/farm\s?house/i,"Farmhouse"], [/\bsalz\b/i,"SALZ"],
+  [/shokubutsu/i,"Shokubutsu"], [/kirei/i,"Kirei"], [/kodomo/i,"Kodomo"], [/\bpao\b/i,"PAO"],
+  [/hajiko/i,"Hajiko"], [/navavej/i,"Navavej"], [/mikku/i,"Mikku"], [/deedo/i,"Deedo"],
+  [/hiclass/i,"HiClass"], [/monchou/i,"Monchou"], [/\btomi\b/i,"Tomi"], [/zilk/i,"Zilk"],
+  [/\bzact\b/i,"Zact"], [/kewpie/i,"Kewpie"], [/hashi/i,"Hashi"], [/richesse/i,"Richesse"],
+  [/\blso\b/i,"LSO"], [/\blms\b/i,"LMS"], [/freshy/i,"Freshy"], [/neobun/i,"Neobun"],
+  [/\bmuay\b/i,"Muay"], [/mewbio/i,"Mewbio"], [/dutch\s?mil/i,"Dutchmill"], [/bissin/i,"Bissin"],
+  [/pulzar/i,"Pulzar"]
 ];
 function normalizeBrand(full, projectName){
   const s=String(full||"");
   for(const [re,name] of BRAND_RULES){ if(re.test(s)) return name; }
-  const tok=String(projectName||"").trim().split(/\s+/)[0];   // fallback: คำแรกของ Project Name
-  return tok||"(ไม่ระบุ)";
+  return "None";   // หาไม่เจอ → None
 }
 // Objective ตรวจด้วย keyword (ทนต่อชื่อหลายรูปแบบ) — ตัวแรกที่ match ชนะ
 const OBJ_RULES=[
