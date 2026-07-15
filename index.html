@@ -1617,7 +1617,7 @@ async function loadBenchmark(){
       return { account:acctOf(r), campaign:r.campaign||"(ไม่ระบุแคมเปญ)",
         brand:p.brand, objective:p.objective, material:p.material,
         spend:sp, impressions:+r.impressions||0, reach:+r.reach||0, clicks:+r.clicks||0,
-        video:fromCost(["cost_per_action_type_video_view"],["video_views","video_view","actions_video_view"]),
+        video:fromCost(["cost_per_action_type_video_view"],["video_views","video_view","actions_video_view"]), v6s:0, v15s:0,
         thruplay:fromCost(["cost_per_thruplay_video_view"],["video_thruplay_watched_actions","thruplays","thruplay"]),
         engage:fromCost(["cost_per_action_type_page_engagement"],["post_engagement","post_engagements","page_engagement"]),
         msg:bnum(r,["actions_onsite_conversion_messaging_conversation_started_7d","actions_onsite_conversion_messaging_conversation_started"]),
@@ -1648,10 +1648,10 @@ function populateBenchFilters(){
 
 // ---- TikTok: ดึงจาก connector "tiktok" (field ชุดพื้นฐาน + fallback) ----
 const TT_TIERS=[
+  "campaign,campaign_name,spend,impressions,reach,clicks,play_duration_2s,play_duration_6s,focused_view_15s",
+  "campaign,spend,impressions,reach,clicks,play_duration_2s,play_duration_6s,focused_view_15s",
   "campaign,campaign_name,spend,impressions,reach,clicks",
   "campaign,spend,impressions,reach,clicks",
-  "campaign_name,spend,impressions,reach,clicks",
-  "campaign,spend,impressions,clicks",
   "campaign_name,spend,impressions,clicks"
 ];
 async function loadBenchmarkTT(){
@@ -1674,7 +1674,8 @@ async function loadBenchmarkTT(){
       const p=parseCampaign(name);
       return { campaign:name, brand:p.brand, objective:p.objective, material:p.material,
         spend:+r.spend||0, impressions:+r.impressions||0, reach:+r.reach||0, clicks:+r.clicks||0,
-        video:0, thruplay:0, engage:0, msg:0, atc:0, purchase:0, viewc:0 };
+        video:bnum(r,["play_duration_2s"]), v6s:bnum(r,["play_duration_6s"]), v15s:bnum(r,["focused_view_15s"]),
+        thruplay:0, engage:0, msg:0, atc:0, purchase:0, viewc:0 };
     });
     benchTTLoaded=true;
     document.getElementById("benchRangeLabel").textContent=`TikTok Cost per Result · ${from} → ${to} · ${benchRawTT.length} แถว`;
@@ -1700,16 +1701,16 @@ function renderBenchmark(){
   const cont=document.getElementById("benchmarkContent");
   if(!rows.length){ cont.innerHTML='<div class="bench-empty">ไม่พบข้อมูลตามตัวกรองที่เลือก</div>'; return; }
 
-  const METR=["spend","impressions","reach","clicks","video","thruplay","engage","msg","atc","purchase","viewc"];
+  const METR=["spend","impressions","reach","clicks","video","v6s","v15s","thruplay","engage","msg","atc","purchase","viewc"];
   const byCamp={};
   rows.forEach(r=>{
-    const c=byCamp[r.campaign]||(byCamp[r.campaign]={campaign:r.campaign,brand:r.brand,objective:r.objective,material:r.material,spend:0,impressions:0,reach:0,clicks:0,video:0,thruplay:0,engage:0,msg:0,atc:0,purchase:0,viewc:0});
-    METR.forEach(m=>c[m]+=r[m]);
+    const c=byCamp[r.campaign]||(byCamp[r.campaign]={campaign:r.campaign,brand:r.brand,objective:r.objective,material:r.material,spend:0,impressions:0,reach:0,clicks:0,video:0,v6s:0,v15s:0,thruplay:0,engage:0,msg:0,atc:0,purchase:0,viewc:0});
+    METR.forEach(m=>c[m]+=(+r[m]||0));
   });
   const camps=Object.values(byCamp);
   camps.forEach(c=>{ const im=c.impressions; c._cost={
     cpm:im?c.spend/im*1000:0, cpr:c.reach?c.spend/c.reach*1000:0,
-    cpv:c.video?c.spend/c.video:0, cptp:c.thruplay?c.spend/c.thruplay:0,
+    cpv:c.video?c.spend/c.video:0, cpv6:c.v6s?c.spend/c.v6s:0, cpv15:c.v15s?c.spend/c.v15s:0, cptp:c.thruplay?c.spend/c.thruplay:0,
     cpc:c.clicks?c.spend/c.clicks:0, cpe:c.engage?c.spend/c.engage:0,
     cpmsg:c.msg?c.spend/c.msg:0, cpvc:c.viewc?c.spend/c.viewc:0,
     cpatc:c.atc?c.spend/c.atc:0, cppur:c.purchase?c.spend/c.purchase:0,
@@ -1775,7 +1776,7 @@ function renderBenchmark(){
       </div>
       <div class="panel bench-panel">
         <div class="panel-head"><h3>Cost Per Result by Brand — Video (TikTok)</h3><span class="bench-count">${brands.length} แบรนด์</span></div>
-        <div class="psub">⚠️ CPV / CPV (6s) / CPV (15s) — ยังไม่ได้ตั้ง field ของ TikTok (—) รอยืนยันชื่อ metric</div>
+        <div class="psub">🟢 ถูก → 🔴 แพง · CPV = spend ÷ play 2s · CPV (6s) = spend ÷ play 6s · CPV (15s) = spend ÷ focused view 15s</div>
         ${brandTable(TT_VIDEO)}
       </div>
       <div class="panel bench-panel">
@@ -1785,7 +1786,7 @@ function renderBenchmark(){
         </tr></thead><tbody>${campRows}</tbody></table></div>
       </div>
       <div class="bench-legend">
-        * TikTok · <b>CPM</b> = spend ÷ impressions ×1000 · <b>CPR</b> = spend ÷ 1,000 reach · <b>CPC</b> = spend ÷ clicks · <b>Frequency</b> = impressions ÷ reach · CPV ต่างๆ รอ field
+        * TikTok · <b>CPM</b> = spend ÷ impressions ×1000 · <b>CPR</b> = spend ÷ 1,000 reach · <b>CPC</b> = spend ÷ clicks · <b>Frequency</b> = impressions ÷ reach · <b>CPV</b> = spend ÷ play 2s · <b>CPV (6s)</b> = spend ÷ play 6s · <b>CPV (15s)</b> = spend ÷ focused view 15s
       </div>`;
     return;
   }
