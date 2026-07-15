@@ -79,6 +79,18 @@
   .bench-filters{display:flex;gap:16px;flex-wrap:wrap;margin-bottom:20px}
   .bench-filters label{display:flex;flex-direction:column;gap:6px;font-size:10.5px;font-weight:600;letter-spacing:.06em;text-transform:uppercase;color:var(--muted)}
   .bench-filters select{min-width:210px;max-width:320px}
+  /* multi-select filter */
+  .ms{position:relative;min-width:210px;max-width:320px}
+  .ms-btn{width:100%;text-align:left;display:flex;justify-content:space-between;align-items:center;gap:8px;font-family:inherit;font-size:13px;font-weight:400;letter-spacing:normal;text-transform:none;color:var(--text);background:var(--surface);border:1px solid var(--gray);border-radius:4px;padding:8px 11px;cursor:pointer;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+  .ms.open .ms-btn{border-color:var(--yellow);border-width:2px;padding:7px 10px}
+  .ms-caret{color:var(--muted);font-size:11px;flex:0 0 auto}
+  .ms-panel{display:none;position:absolute;z-index:50;top:calc(100% + 4px);left:0;right:0;background:var(--surface);border:1px solid var(--border);border-radius:8px;box-shadow:0 8px 24px rgba(16,24,40,.14);padding:6px;max-height:320px;overflow:auto}
+  .ms.open .ms-panel{display:block}
+  .ms-search{width:100%;font-size:12px;padding:6px 8px;border:1px solid var(--border);border-radius:4px;margin-bottom:4px}
+  .ms-opt{display:flex;align-items:center;gap:8px;padding:6px 8px;border-radius:4px;font-size:13px;font-weight:400;text-transform:none;letter-spacing:normal;color:var(--text);cursor:pointer}
+  .ms-opt:hover{background:var(--well)}
+  .ms-opt input{cursor:pointer;margin:0}
+  .ms-all{border-bottom:1px solid var(--border);border-radius:0;margin-bottom:2px;font-weight:600}
   .bench-panel{margin-bottom:22px;box-shadow:0 1px 3px rgba(16,24,40,.05),0 1px 2px rgba(16,24,40,.03)}
   .bench-count{color:var(--muted);font-size:12px;font-weight:500}
 
@@ -381,9 +393,9 @@
     <div class="pill" data-m="ttrate">TT Result Rate</div>
   </div>
   <div class="bench-filters">
-    <label>Objective<select id="benchFObjective"><option value="">— ทั้งหมด —</option></select></label>
-    <label>Brand name<select id="benchFBrand"><option value="">— ทั้งหมด —</option></select></label>
-    <label>Material type<select id="benchFMaterial"><option value="">— ทั้งหมด —</option></select></label>
+    <label>Objective<div class="ms" id="msObjective"></div></label>
+    <label>Brand name<div class="ms" id="msBrand"></div></label>
+    <label>Material type<div class="ms" id="msMaterial"></div></label>
   </div>
   <div id="benchmarkContent"><div class="loading">กำลังดึงข้อมูลจาก Windsor…</div></div>
 </section>
@@ -1486,8 +1498,9 @@ document.getElementById("backBtn").onclick=showLanding;
    ============================================================ */
 let benchRaw=[], benchLoaded=false, benchFrom="2025-01-01", benchTo="", benchMode="cost";
 let benchRawTT=[], benchTTLoaded=false;   // TikTok data
-const benchFilter={objective:"",brand:"",material:""};
+const benchFilter={objective:[],brand:[],material:[]};   // multi-select → arrays
 function benchActive(){ return benchMode.startsWith("tt") ? benchRawTT : benchRaw; }
+const benchEsc=s=>String(s==null?"":s).replace(/&/g,"&amp;").replace(/</g,"&lt;").replace(/"/g,"&quot;");
 
 // base field ที่ชัวร์ + ชุด result เสริม (best-effort, ไล่ fallback ถ้า Windsor ปฏิเสธ field)
 // ไม่ใส่ date → Windsor รวมยอดต่อแคมเปญให้เลย (แถวน้อยลงมาก เร็วขึ้น ไม่ timeout)
@@ -1674,16 +1687,29 @@ async function loadBenchmark(){
   }
 }
 
+function renderMultiSelect(id,key,values){
+  const el=document.getElementById(id); if(!el) return;
+  const sel=benchFilter[key];
+  el.innerHTML=`<button type="button" class="ms-btn"></button>
+    <div class="ms-panel">
+      <input type="text" class="ms-search" placeholder="ค้นหา…">
+      <label class="ms-opt ms-all"><input type="checkbox" class="ms-allbox"><span>— ทั้งหมด —</span></label>
+      <div class="ms-list">${values.map(v=>`<label class="ms-opt" data-v="${benchEsc(v)}"><input type="checkbox" class="ms-cb"${sel.includes(v)?' checked':''}><span>${benchEsc(v)}</span></label>`).join("")}</div>
+    </div>`;
+  const btn=el.querySelector(".ms-btn"), allbox=el.querySelector(".ms-allbox"), search=el.querySelector(".ms-search");
+  const updateSummary=()=>{ const s=benchFilter[key]; btn.innerHTML=benchEsc(s.length===0?"— ทั้งหมด —":(s.length===1?s[0]:s.length+" รายการ"))+' <span class="ms-caret">▾</span>'; allbox.checked=s.length===0; };
+  updateSummary();
+  btn.onclick=()=>el.classList.toggle("open");
+  allbox.onchange=()=>{ benchFilter[key]=[]; el.querySelectorAll(".ms-cb").forEach(cb=>cb.checked=false); updateSummary(); renderBenchmark(); };
+  el.querySelectorAll(".ms-cb").forEach(cb=>{ cb.onchange=()=>{ const v=cb.closest(".ms-opt").dataset.v, arr=benchFilter[key], i=arr.indexOf(v); if(cb.checked){ if(i<0) arr.push(v); } else if(i>=0) arr.splice(i,1); updateSummary(); renderBenchmark(); }; });
+  search.oninput=()=>{ const q=search.value.toLowerCase(); el.querySelectorAll(".ms-list .ms-opt").forEach(o=>{ o.style.display=o.dataset.v.toLowerCase().includes(q)?"":"none"; }); };
+}
 function populateBenchFilters(){
   const uniq=arr=>[...new Set(arr)].filter(x=>x&&x!=="(ไม่ระบุ)").sort((a,b)=>a.localeCompare(b));
-  const fill=(id,vals,cur)=>{
-    const sel=document.getElementById(id); if(!sel) return;
-    sel.innerHTML='<option value="">— ทั้งหมด —</option>'+vals.map(v=>`<option value="${String(v).replace(/"/g,'&quot;')}"${v===cur?' selected':''}>${v}</option>`).join("");
-  };
   const src=benchActive();
-  fill("benchFObjective",uniq(src.map(r=>r.objective)),benchFilter.objective);
-  fill("benchFBrand",uniq(src.map(r=>r.brand)),benchFilter.brand);
-  fill("benchFMaterial",uniq(src.map(r=>r.material)),benchFilter.material);
+  renderMultiSelect("msObjective","objective",uniq(src.map(r=>r.objective)));
+  renderMultiSelect("msBrand","brand",uniq(src.map(r=>r.brand)));
+  renderMultiSelect("msMaterial","material",uniq(src.map(r=>r.material)));
 }
 
 // ---- TikTok: ดึงจาก connector "tiktok" (field ชุดพื้นฐาน + fallback) ----
@@ -1734,10 +1760,11 @@ function bstat(arr){
 }
 
 function renderBenchmark(){
+  const inSel=(arr,v)=>!arr.length||arr.includes(v);
   const rows=benchActive().filter(r=>
-    (!benchFilter.objective||r.objective===benchFilter.objective)&&
-    (!benchFilter.brand||r.brand===benchFilter.brand)&&
-    (!benchFilter.material||r.material===benchFilter.material));
+    inSel(benchFilter.objective,r.objective)&&
+    inSel(benchFilter.brand,r.brand)&&
+    inSel(benchFilter.material,r.material));
   const cont=document.getElementById("benchmarkContent");
   if(!rows.length){ cont.innerHTML='<div class="bench-empty">ไม่พบข้อมูลตามตัวกรองที่เลือก</div>'; return; }
 
@@ -1952,15 +1979,14 @@ document.getElementById("benchModeTabs").onclick=e=>{
   const p=e.target.closest(".pill"); if(!p) return;
   document.querySelectorAll("#benchModeTabs .pill").forEach(x=>x.classList.remove("active"));
   p.classList.add("active"); benchMode=p.dataset.m;
-  benchFilter.objective=benchFilter.brand=benchFilter.material="";   // reset ตัวกรองตอนสลับแหล่งข้อมูล
+  benchFilter.objective=[]; benchFilter.brand=[]; benchFilter.material=[];   // reset ตัวกรองตอนสลับแหล่งข้อมูล
   const isTT=benchMode.startsWith("tt");
   if(isTT && !benchTTLoaded){ loadBenchmarkTT(); return; }
   if(!isTT && !benchLoaded){ loadBenchmark(); return; }
   populateBenchFilters(); renderBenchmark();
 };
-document.getElementById("benchFObjective").onchange=e=>{ benchFilter.objective=e.target.value; renderBenchmark(); };
-document.getElementById("benchFBrand").onchange=e=>{ benchFilter.brand=e.target.value; renderBenchmark(); };
-document.getElementById("benchFMaterial").onchange=e=>{ benchFilter.material=e.target.value; renderBenchmark(); };
+// ปิด panel multi-select เมื่อคลิกนอกกล่อง
+document.addEventListener("click",e=>{ document.querySelectorAll(".ms.open").forEach(ms=>{ if(!ms.contains(e.target)) ms.classList.remove("open"); }); });
 
 showLanding();
 </script>
