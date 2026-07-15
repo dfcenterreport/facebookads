@@ -139,6 +139,10 @@
   .bench-legend{font-size:12px;color:var(--muted);line-height:1.9;margin-top:6px}
   .bench-legend b{color:var(--text);font-weight:600}
   .bench-empty{padding:44px;text-align:center;color:var(--muted)}
+  /* Google Looker Studio embed */
+  .g-embed-bar{display:flex;justify-content:space-between;align-items:center;gap:14px;flex-wrap:wrap;margin-bottom:12px;font-size:13px;color:var(--muted)}
+  .g-embed{width:100%;height:80vh;min-height:600px;border:1px solid var(--border);border-radius:10px;background:var(--surface)}
+  .g-embed-note{font-size:12px;color:var(--muted);margin-top:8px}
   .kpi{background:var(--surface);border:1px solid var(--border);border-radius:8px;padding:16px}
   .kpi.primary{border-left:4px solid var(--yellow)}
   .kpi .klabel{font-family:'JetBrains Mono',monospace;font-size:11px;font-weight:500;letter-spacing:.05em;color:var(--muted);text-transform:uppercase}
@@ -394,6 +398,8 @@
     <div class="pill" data-m="rate">FB Result Rate</div>
     <div class="pill" data-m="ttcost">TT Cost per</div>
     <div class="pill" data-m="ttrate">TT Result Rate</div>
+    <div class="pill" data-m="gcost">Google Cost per</div>
+    <div class="pill" data-m="gresult">Google Result</div>
   </div>
   <div class="bench-filters">
     <label>Objective<div class="ms" id="msObjective"></div></label>
@@ -1715,6 +1721,26 @@ function populateBenchFilters(){
   renderMultiSelect("msMaterial","material",uniq(src.map(r=>r.material)));
 }
 
+// ---- Google (Looker Studio) — ฝังรายงานจริงผ่าน iframe (ไม่มีใน Windsor) ----
+const G_REPORT="e741bfa5-b095-4ccf-afe2-48dc1e4c3263";
+const G_PAGE={gcost:"p_p30t714wwd", gresult:"p_106vbf0sxd"};
+const gEmbedUrl=pg=>`https://lookerstudio.google.com/embed/reporting/${G_REPORT}/page/${pg}`;
+const gOpenUrl =pg=>`https://lookerstudio.google.com/reporting/${G_REPORT}/page/${pg}`;
+function isGoogleMode(){ return benchMode==="gcost"||benchMode==="gresult"; }
+function setBenchFiltersVisible(show){ const f=document.querySelector("#benchmarkView .bench-filters"); if(f) f.style.display=show?"flex":"none"; }
+function renderGoogleEmbed(){
+  setBenchFiltersVisible(false);
+  const pg=G_PAGE[benchMode], title=benchMode==="gcost"?"Google Cost per Result":"Google Result Rate";
+  const lbl=document.getElementById("benchRangeLabel"); if(lbl) lbl.textContent=`${title} · รายงาน Looker Studio (ฝังจากเว็บจริง)`;
+  document.getElementById("benchmarkContent").innerHTML=`
+    <div class="g-embed-bar">
+      <span>📊 ${title} — ฝังจาก Google Looker Studio (ข้อมูล Google ไม่ได้ผ่าน Windsor จึงแสดงรายงานจริงแทน)</span>
+      <a href="${gOpenUrl(pg)}" target="_blank" rel="noopener" class="btn-primary">↗ เปิดในแท็บใหม่</a>
+    </div>
+    <iframe class="g-embed" src="${gEmbedUrl(pg)}" allowfullscreen frameborder="0"></iframe>
+    <div class="g-embed-note">ถ้ารายงานไม่แสดง = ยังไม่ได้เปิดสิทธิ์ฝังใน Looker Studio (File → Embed report → เปิด Enable embedding) หรือกด “เปิดในแท็บใหม่” แทน</div>`;
+}
+
 // ---- TikTok: ดึงจาก connector "tiktok" (field ชุดพื้นฐาน + fallback) ----
 const TT_TIERS=[
   "campaign,campaign_name,spend,impressions,reach,clicks,play_duration_2s,play_duration_6s,focused_view_15s",
@@ -1955,7 +1981,7 @@ document.getElementById("topNav").onclick=e=>{
     if(view==="activeacct" && !activeAcctData.length) loadActiveAccounts();
     if(view==="activeacct" && !acctMonthlyLoaded) loadMonthlyTrend();
     if(view==="biddable" && !bidLoaded) loadBiddable();
-    if(view==="benchmark"){ const isTT=benchMode.startsWith("tt"); if(isTT&&!benchTTLoaded) loadBenchmarkTT(); else if(!isTT&&!benchLoaded) loadBenchmark(); }
+    if(view==="benchmark"){ if(isGoogleMode()){ renderGoogleEmbed(); } else { const isTT=benchMode.startsWith("tt"); if(isTT&&!benchTTLoaded) loadBenchmarkTT(); else if(!isTT&&!benchLoaded) loadBenchmark(); } }
   }else{
     SIDE_VIEWS.forEach(v=>document.getElementById(v+"View").style.display="none");
     if(viewBeforeSide==="dashboard") document.getElementById("dashboardView").style.display="block";
@@ -1982,6 +2008,8 @@ document.getElementById("benchModeTabs").onclick=e=>{
   const p=e.target.closest(".pill"); if(!p) return;
   document.querySelectorAll("#benchModeTabs .pill").forEach(x=>x.classList.remove("active"));
   p.classList.add("active"); benchMode=p.dataset.m;
+  if(isGoogleMode()){ renderGoogleEmbed(); return; }   // Google: ฝัง iframe, ไม่ดึง Windsor
+  setBenchFiltersVisible(true);
   benchFilter.objective=[]; benchFilter.brand=[]; benchFilter.material=[];   // reset ตัวกรองตอนสลับแหล่งข้อมูล
   const isTT=benchMode.startsWith("tt");
   if(isTT && !benchTTLoaded){ loadBenchmarkTT(); return; }
