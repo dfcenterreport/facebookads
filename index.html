@@ -1724,7 +1724,7 @@ function populateBenchFilters(){
 // ---- Google (Looker Studio) — ฝังรายงานจริงผ่าน iframe (ไม่มีใน Windsor) ----
 const G_REPORT="e741bfa5-b095-4ccf-afe2-48dc1e4c3263";
 const G_PAGE={gcost:"p_p30t714wwd", gresult:"p_106vbf0sxd"};
-const gEmbedUrl=pg=>`https://lookerstudio.google.com/embed/reporting/${G_REPORT}/page/${pg}`;
+const gEmbedUrl=pg=>`https://datastudio.google.com/embed/reporting/${G_REPORT}/page/${pg}`;
 const gOpenUrl =pg=>`https://lookerstudio.google.com/reporting/${G_REPORT}/page/${pg}`;
 function isGoogleMode(){ return benchMode==="gcost"||benchMode==="gresult"; }
 function setBenchFiltersVisible(show){ const f=document.querySelector("#benchmarkView .bench-filters"); if(f) f.style.display=show?"flex":"none"; }
