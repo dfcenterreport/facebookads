@@ -1319,7 +1319,7 @@ function bidBuildPptx(){
       y+=Math.ceil(cells.length/3)*(ch+gap)+0.12;
     };
     section("Reach & Impressions",[[d.reachTotal,"Lifetime Post Total reach"],[d.reachOrg,"Lifetime Post Organic reach"],[d.reachPaid,"Lifetime Post Paid reach"],[d.imprTotal,"Lifetime Post Total impression"],[d.imprOrg,"Lifetime Post Organic impression"],[d.imprPaid,"Lifetime Post Paid impression"]]);
-    section("Reactions",[[d.like,"Like"],[d.love,"Love"],[d.haha,"Haha"],[d.wow,"Wow"],[d.sad,"Sad"],[d.angry,"Angry"]]);
+    section("Reactions",[[d.like,"Like"]]);
     section("Share Comments and Post Click",[[d.share,"Share"],[d.comment,"Comment"],[d.postClick,"Post Click"]]);
   });
   const fn=`Performance Report_${bidAccount==="__all__"?"All":String(bidAccount).replace(/[^\w]+/g,"_")}.pptx`;
@@ -1411,11 +1411,6 @@ function selectCreative(i){
           <div class="pp-sec">Reactions</div>
           <div class="pp-box">
             ${stat(RE.like.v,"Like",RE.like.na)}
-            ${stat(RE.love.v,"Love",RE.love.na)}
-            ${stat(RE.haha.v,"Haha",RE.haha.na)}
-            ${stat(RE.wow.v,"Wow",RE.wow.na)}
-            ${stat(RE.sad.v,"Sad",RE.sad.na)}
-            ${stat(RE.angry.v,"Angry",RE.angry.na)}
           </div>
           <div class="pp-note">${
             apLoading ? "⏳ กำลังดึง reactions / share / comment จาก Apify…"
