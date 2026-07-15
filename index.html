@@ -364,11 +364,18 @@
       <div class="pills" id="bidDatePills">
         <div class="pill" data-v="last_7d">7 วัน</div>
         <div class="pill" data-v="last_14d">14 วัน</div>
-        <div class="pill active" data-v="last_30d">30 วัน</div>
+        <div class="pill" data-v="last_30d">30 วัน</div>
         <div class="pill" data-v="this_month">เดือนนี้</div>
         <div class="pill" data-v="last_month">เดือนก่อน</div>
       </div>
+      <div class="range">
+        <input type="date" id="bidDFrom" title="วันเริ่มต้น">
+        <span class="rdash">–</span>
+        <input type="date" id="bidDTo" title="วันสิ้นสุด">
+        <button id="bidApply">ใช้</button>
+      </div>
       <button id="bidRefresh" class="btn-primary">↻ รีเฟรช</button>
+      <button id="bidGenReport" class="btn-primary" title="สร้างรายงาน PowerPoint จาก Performance for your post">🧠 GEN AI Report</button>
       <button id="bidDebug" title="ตรวจข้อมูล facebook_organic">🔧</button>
       <button id="bidApifyDebug" title="ทดสอบ Apify (reactions/share/comment)">🧪</button>
     </div>
@@ -943,7 +950,9 @@ function toggleRow(i){
 function sortBy(k){ if(sortKey===k) sortDir*=-1; else {sortKey=k; sortDir=-1;} render(); }
 
 /* ---------------- BIDDABLE — creative monitor (เจาะบัญชี + แคมเปญ) ---------------- */
-let bidRaw=[], bidAccount="__all__", bidCampaign="", bidPreset="last_30d", bidLoaded=false, bidChart=null, bidNoImg=false, bidAuto=true;
+let bidRaw=[], bidAccount="__all__", bidCampaign="", bidPreset="custom", bidFrom="", bidTo="", bidLoaded=false, bidChart=null, bidNoImg=false, bidAuto=true;
+(function(){ const n=new Date(),y=n.getFullYear(),m=n.getMonth(); const f=d=>`${d.getFullYear()}-${String(d.getMonth()+1).padStart(2,"0")}-${String(d.getDate()).padStart(2,"0")}`; bidFrom=f(new Date(y,m-1,1)); bidTo=f(new Date(y,m,0)); })();  // default = เดือนก่อน (previous month)
+function bidRange(){ return bidPreset==="custom" ? `date_from=${bidFrom}&date_to=${bidTo}` : `date_preset=${bidPreset}`; }
 let bidCreatives=[], bidSel=-1;
 let orgPosts=[], orgTier=-1;   // โพสต์จาก facebook_organic (Page Insights)
 let apifyCache={};             // url -> item | null(fail) | "loading"
@@ -967,7 +976,7 @@ async function loadOrganic(){
   orgPosts=[]; orgTier=-1;
   for(let i=0;i<ORG_TIERS.length;i++){
     try{
-      const res=await wfetch(`date_preset=${bidPreset}&fields=${ORG_TIERS[i]}`, "facebook_organic");
+      const res=await wfetch(`${bidRange()}&fields=${ORG_TIERS[i]}`, "facebook_organic");
       if(!res.ok) continue;
       const rows=(await res.json()).data||[];
       const m={};
@@ -1035,7 +1044,7 @@ async function loadBiddable(){
       const f=BID_BASE+(o?","+o:"");
       // ใช้ connector "facebook" ตรงๆ — มี field เฉพาะ FB ครบ (effective_object_story_id, thumbnail_url)
       // ต่างจาก "/all" ที่รวมหลาย source แล้ว field เฉพาะ FB มักหาย (โดยเฉพาะ video ad)
-      const res=await wfetch(`date_preset=${bidPreset}&fields=${f}`, "facebook");
+      const res=await wfetch(`${bidRange()}&fields=${f}`, "facebook");
       if(res.ok){ data=(await res.json()).data||[]; opt=o; break; }
       lastStatus=res.status; lastBody=(await res.text()).slice(0,200);
       // ถ้าเป็นปัญหา key/สิทธิ์ (ไม่ใช่ field) ไม่ต้องลอง tier ต่อ
@@ -1241,6 +1250,82 @@ function creCard(c,i){
   </div>`;
 }
 
+/* ===== GEN AI Report → PowerPoint (Performance for your post, ไม่ติด cost) ===== */
+let bidPptxLoading=null;
+function bidEnsurePptx(){
+  if(window.PptxGenJS) return Promise.resolve();
+  if(bidPptxLoading) return bidPptxLoading;
+  bidPptxLoading=new Promise((res,rej)=>{ const s=document.createElement("script"); s.src="https://cdn.jsdelivr.net/npm/pptxgenjs@3.12.0/dist/pptxgen.bundle.js"; s.onload=()=>res(); s.onerror=()=>rej(new Error("โหลด PptxGenJS ไม่ได้")); document.head.appendChild(s); });
+  return bidPptxLoading;
+}
+function bidFmtDate(v){ if(v==null||v==="") return "—"; if(typeof v==="number"){ const d=new Date(v>1e12?v:v*1000); return isNaN(d.getTime())?String(v):d.toUTCString(); } return String(v); }
+function bidPerfData(c){
+  const post=matchOrgPost(c);
+  const link=(post&&post.permalink)||c.link||"";
+  const ap=(link && apifyCache[link] && apifyCache[link]!=="loading")?apifyCache[link]:null;
+  const pick=(apKeys,winVal)=>{ if(ap){ for(const k of apKeys){ if(ap[k]!=null&&ap[k]!=="") return +ap[k]||0; } } return winVal!=null?winVal:null; };
+  const totReach=c.reach, totImpr=c.impressions;
+  const R = post ? {tr:post.reach||totReach, or:null, pr:null, ti:post.impr||totImpr, oi:post.imprOrg, pi:post.imprPaid}
+                 : {tr:totReach, or:null, pr:totReach, ti:totImpr, oi:null, pi:totImpr};
+  return {
+    name:c.ad, page: bidAccount==="__all__"?(bidCampaign||c.adset||"—"):bidAccount,
+    link, type:c.thumb?"Photo":"—",
+    postDate: pick(["time","date","timestamp","publishedTime","postedAt"], null),
+    reachTotal:R.tr, reachOrg:R.or, reachPaid:R.pr, imprTotal:R.ti, imprOrg:R.oi, imprPaid:R.pi,
+    like:pick(["likes","reactionLikeCount","reactionsCount"], post?post.like:null),
+    love:pick(["reactionLoveCount","loveCount"], post?post.love:null),
+    haha:pick(["reactionHahaCount","hahaCount"], post?post.haha:null),
+    wow:pick(["reactionWowCount","wowCount"], post?post.wow:null),
+    sad:pick(["reactionSadCount","sadCount"], post?post.sad:null),
+    angry:pick(["reactionAngryCount","angryCount"], post?post.angry:null),
+    share:pick(["shares","shareCount","sharesCount"], null),
+    comment:pick(["comments","commentCount","commentsCount"], null),
+    postClick:(post&&post.clicks)?post.clicks:c.clicks
+  };
+}
+async function bidGenReport(){
+  if(!bidCreatives||!bidCreatives.length){ alert("ยังไม่มีข้อมูล creative — เปิดหน้า Creative Report ให้โหลดข้อมูลก่อน"); return; }
+  const btn=document.getElementById("bidGenReport"), orig=btn.textContent; btn.disabled=true;
+  try{
+    btn.textContent="⏳ โหลดตัวสร้าง PPT…"; await bidEnsurePptx();
+    // ดึง Apify (reactions/share/comment) ให้ครบทุกโพสต์ก่อน
+    const links=[...new Set(bidCreatives.map(c=>{ const p=matchOrgPost(c); return (p&&p.permalink)||c.link||""; }).filter(Boolean))];
+    for(let i=0;i<links.length;i++){ const l=links[i];
+      if(apifyCache[l]===undefined || apifyCache[l]==="loading"){ btn.textContent=`⏳ ดึงข้อมูลโพสต์ ${i+1}/${links.length}…`; try{ apifyCache[l]=await fetchApify(l); }catch(e){ apifyCache[l]=null; } }
+    }
+    btn.textContent="⏳ สร้างสไลด์…"; bidBuildPptx();
+    btn.textContent="✓ ดาวน์โหลดแล้ว"; setTimeout(()=>{ btn.textContent=orig; btn.disabled=false; },2500);
+  }catch(e){ alert("สร้างรายงานไม่สำเร็จ: "+e.message); btn.textContent=orig; btn.disabled=false; }
+}
+function bidBuildPptx(){
+  const pptx=new PptxGenJS(); pptx.defineLayout({name:"W",width:13.333,height:7.5}); pptx.layout="W";
+  const INK="1A1A1B", MUT="6B7178", BOX="F2F3F4", LINE="E2E4E6";
+  const fI=v=>(v==null)?"—":Math.round(v).toLocaleString("en-US");
+  const mx=4.0, mw=9.0;
+  bidCreatives.forEach(c=>{
+    const d=bidPerfData(c), s=pptx.addSlide();
+    s.addText("Performance for your post",{x:0.4,y:0.3,w:12.5,h:0.5,fontSize:22,bold:true,color:INK});
+    s.addText(String(d.name||""),{x:0.4,y:1.0,w:3.3,h:5.5,fontSize:11,color:MUT,valign:"top"});
+    const meta=[["Page name:",d.page],["Link Post:",d.link||"—"],["Type:",d.type],["Post Message:",bidFmtDate(d.postDate)]];
+    let y=1.0;
+    meta.forEach(([k,v])=>{ s.addText([{text:k+" ",options:{bold:true,color:INK}},{text:String(v),options:{color:MUT}}],{x:mx,y,w:mw,h:0.3,fontSize:11,valign:"middle"}); y+=0.34; });
+    const cw=(mw-0.16)/3, ch=0.6, gap=0.08;
+    const section=(title,cells)=>{
+      s.addText(title,{x:mx,y:y+0.05,w:mw,h:0.3,fontSize:13,bold:true,color:INK,underline:true}); y+=0.42;
+      cells.forEach((cell,idx)=>{ const col=idx%3, row=Math.floor(idx/3); const cx=mx+col*(cw+gap), cy=y+row*(ch+gap);
+        s.addShape("rect",{x:cx,y:cy,w:cw,h:ch,fill:{color:BOX},line:{color:LINE,width:0.5}});
+        s.addText([{text:fI(cell[0])+"\n",options:{fontSize:15,bold:true,color:INK}},{text:cell[1],options:{fontSize:8,color:MUT}}],{x:cx+0.05,y:cy,w:cw-0.1,h:ch,align:"left",valign:"middle"});
+      });
+      y+=Math.ceil(cells.length/3)*(ch+gap)+0.12;
+    };
+    section("Reach & Impressions",[[d.reachTotal,"Lifetime Post Total reach"],[d.reachOrg,"Lifetime Post Organic reach"],[d.reachPaid,"Lifetime Post Paid reach"],[d.imprTotal,"Lifetime Post Total impression"],[d.imprOrg,"Lifetime Post Organic impression"],[d.imprPaid,"Lifetime Post Paid impression"]]);
+    section("Reactions",[[d.like,"Like"],[d.love,"Love"],[d.haha,"Haha"],[d.wow,"Wow"],[d.sad,"Sad"],[d.angry,"Angry"]]);
+    section("Share Comments and Post Click",[[d.share,"Share"],[d.comment,"Comment"],[d.postClick,"Post Click"]]);
+  });
+  const fn=`Performance Report_${bidAccount==="__all__"?"All":String(bidAccount).replace(/[^\w]+/g,"_")}.pptx`;
+  pptx.writeFile({fileName:fn});
+}
+
 function selectCreative(i){
   document.querySelectorAll(".cre-card").forEach(x=>x.classList.remove("sel"));
   const card=document.getElementById("cre-"+i); if(card) card.classList.add("sel");
@@ -1419,7 +1504,7 @@ document.getElementById("bidDebug").onclick=async()=>{
   html+=`<div style="margin-top:10px"><b>creatives ปัจจุบัน (join key)</b><pre style="white-space:pre-wrap;font-size:11px;max-height:120px;overflow:auto;background:var(--well);padding:8px;border-radius:4px;margin-top:4px">${(sids||"(เลือกแคมเปญก่อน)").replace(/</g,"&lt;")}</pre></div>`;
   for(const [name,f,conn] of tries){
     try{
-      const res=await wfetch(`date_preset=${bidPreset}&fields=${f}`, conn||undefined);
+      const res=await wfetch(`${bidRange()}&fields=${f}`, conn||undefined);
       const txt=await res.text();
       html+=`<div style="margin-top:10px"><b>${name}</b> → HTTP ${res.status}<pre style="white-space:pre-wrap;font-size:11px;max-height:180px;overflow:auto;background:var(--well);padding:8px;border-radius:4px;margin-top:4px">${txt.slice(0,1200).replace(/&/g,"&amp;").replace(/</g,"&lt;")}</pre></div>`;
     }catch(e){ html+=`<div style="margin-top:10px"><b>${name}</b> → ERROR ${e.message}</div>`; }
@@ -1452,6 +1537,17 @@ document.getElementById("bidDatePills").onclick=e=>{
   p.classList.add("active"); bidPreset=p.dataset.v;
   bidLoaded=false; loadBiddable();
 };
+// เติมค่า date input เริ่มต้น = เดือนก่อน
+(function(){ const f=document.getElementById("bidDFrom"), t=document.getElementById("bidDTo"); if(f) f.value=bidFrom; if(t) t.value=bidTo; })();
+document.getElementById("bidApply").onclick=()=>{
+  const f=document.getElementById("bidDFrom").value, t=document.getElementById("bidDTo").value;
+  if(!f||!t){ alert("กรุณาเลือกทั้งวันเริ่มต้นและวันสิ้นสุด"); return; }
+  if(f>t){ alert("วันเริ่มต้นต้องไม่เกินวันสิ้นสุด"); return; }
+  bidFrom=f; bidTo=t; bidPreset="custom";
+  document.querySelectorAll("#bidDatePills .pill").forEach(x=>x.classList.remove("active"));
+  bidLoaded=false; loadBiddable();
+};
+document.getElementById("bidGenReport").onclick=bidGenReport;
 document.getElementById("refresh").onclick=load;
 document.getElementById("refreshLanding").onclick=()=>{ landingAccts=[]; loadAccounts(); };
 document.getElementById("acctStatusFilter").onclick=e=>{
