@@ -8,7 +8,6 @@
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
 <link href="https://fonts.googleapis.com/css2?family=Hanken+Grotesk:wght@500;600;700&family=Work+Sans:wght@400;500;600&family=JetBrains+Mono:wght@400;500;700&family=Noto+Sans+Thai:wght@400;500;600;700&display=swap" rel="stylesheet">
 <script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.1/dist/chart.umd.min.js"></script>
-<script src="https://cdn.jsdelivr.net/npm/xlsx-js-style@1.2.0/dist/xlsx.bundle.js"></script>
 <style>
   :root{
     /* Luminous Precision — CI Yellow / Gray / White */
@@ -2031,9 +2030,20 @@ let mpPlans=null;
 const MP_MONTHS={Jan:"January",Feb:"February",Mar:"March",Apr:"April",May:"May",Jun:"June",Jul:"July",Aug:"August",Sep:"September",Oct:"October",Nov:"November",Dec:"December"};
 const mpNorm=s=>String(s==null?"":s).trim();
 
+let mpXlsxLoading=null;
+function mpEnsureXLSX(){
+  if(window.XLSX) return Promise.resolve();
+  if(mpXlsxLoading) return mpXlsxLoading;
+  mpXlsxLoading=new Promise((res,rej)=>{ const s=document.createElement("script"); s.src="https://cdn.jsdelivr.net/npm/xlsx-js-style@1.2.0/dist/xlsx.bundle.js"; s.onload=()=>res(); s.onerror=()=>rej(new Error("โหลดไลบรารี xlsx ไม่สำเร็จ")); document.head.appendChild(s); });
+  return mpXlsxLoading;
+}
 function mpReadFile(file){
   const cont=document.getElementById("mpContent");
-  cont.innerHTML='<div class="loading">กำลังอ่านไฟล์ '+mpNorm(file.name)+' …</div>';
+  cont.innerHTML='<div class="loading">กำลังโหลดตัวอ่าน Excel + อ่านไฟล์ '+mpNorm(file.name)+' …</div>';
+  mpEnsureXLSX().then(()=>mpDoRead(file)).catch(err=>{ cont.innerHTML=`<div class="mp-err">❌ ${err.message}</div>`; });
+}
+function mpDoRead(file){
+  const cont=document.getElementById("mpContent");
   const rd=new FileReader();
   rd.onload=e=>{
     try{
