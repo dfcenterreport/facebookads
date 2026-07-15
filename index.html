@@ -1788,6 +1788,30 @@ function bstat(arr){
   return {avg:sum/a.length,min:a[0],max:a[a.length-1],med:a.length%2?a[mid]:(a[mid-1]+a[mid])/2};
 }
 
+// AI Recommend — สรุปค่าเฉลี่ย benchmark ต่อ metric ไว้อ้างอิงตอน report แบรนด์
+function benchRecoBlock(camps, byBrand, brands, metrics){
+  const items=metrics.map(m=>{
+    const f=m.f;
+    const vals=camps.map(c=>c._cost[m.k]).filter(v=>v>0&&isFinite(v));
+    if(!vals.length) return null;
+    const avg=vals.reduce((s,x)=>s+x,0)/vals.length;
+    const sorted=[...vals].sort((a,b)=>a-b), med=sorted[Math.floor(sorted.length/2)];
+    const bAvg=brands.map(b=>{ const bv=byBrand[b].map(c=>c._cost[m.k]).filter(v=>v>0&&isFinite(v)); return bv.length?{b,v:bv.reduce((s,x)=>s+x,0)/bv.length}:null; }).filter(Boolean);
+    bAvg.sort((a,b)=> m.hi ? b.v-a.v : a.v-b.v);   // เรียง "ดีสุด" ก่อน (rate=สูง, cost=ต่ำ)
+    const best=bAvg[0];
+    const above=bAvg.filter(x=> m.hi ? x.v>avg : x.v<avg).length;
+    const cmp=m.hi?"เหนือค่าเฉลี่ย":"ถูกกว่าค่าเฉลี่ย";
+    const detail=`Benchmark เฉลี่ย <b>${f(avg)}</b> · มัธยฐาน ${f(med)} · ${brands.length} แบรนด์ (${above} แบรนด์${cmp})${best?` · ดีสุด: ${benchEsc(best.b)} (${f(best.v)})`:""}`;
+    return `<div class="reco reco-info"><div class="reco-ic">📊</div><div class="reco-tx"><div class="reco-t">${m.l}</div><div class="reco-d">${detail}</div></div></div>`;
+  }).filter(Boolean).join("");
+  return `<div class="panel bench-panel">
+    <div class="ai-reco" style="margin-top:0;border-top:0;padding-top:0">
+      <div class="ai-reco-head"><span class="ai-badge">✨ AI</span><h3>AI Recommend — Benchmark อ้างอิง</h3></div>
+      <div class="ai-reco-sub">ค่าเฉลี่ย benchmark ต่อ metric (จากข้อมูลตามตัวกรองปัจจุบัน) ใช้เป็นเกณฑ์อ้างอิงเวลา report แต่ละแบรนด์ว่าเหนือ/ต่ำกว่าค่ากลาง</div>
+      <div class="ai-reco-list">${items}</div>
+    </div></div>`;
+}
+
 function renderBenchmark(){
   const inSel=(arr,v)=>!arr.length||arr.includes(v);
   const rows=benchActive().filter(r=>
@@ -1909,6 +1933,7 @@ function renderBenchmark(){
           <th class="rn">#</th><th>Campaign</th><th>Brand</th><th>Material type</th><th>Spend tier</th><th>VR% (2s)</th><th>VR% (6s)</th><th>VR% (15s)</th><th>CTR</th><th>Frequency</th>
         </tr></thead><tbody>${campRows}</tbody></table></div>
       </div>
+      ${benchRecoBlock(camps,byBrand,brands,TT_RATE)}
       <div class="bench-legend">
         * TikTok · <b>VR% (2s)</b> = play 2s ÷ impressions · <b>VR% (6s)</b> = play 6s ÷ impressions · <b>VR% (15s)</b> = focused view 15s ÷ impressions · <b>CTR</b> = clicks ÷ impressions · <b>Frequency</b> = impressions ÷ reach
       </div>`;
@@ -1933,6 +1958,7 @@ function renderBenchmark(){
           <th class="rn">#</th><th>Campaign</th><th>Brand</th><th>Material type</th><th>Spend</th><th>Avg VR% 3s</th><th>Avg VR% Thruplay</th><th>Avg ER%</th><th>Avg CTR</th>
         </tr></thead><tbody>${campRows}</tbody></table></div>
       </div>
+      ${benchRecoBlock(camps,byBrand,brands,RATE)}
       <div class="bench-legend">
         * <b>VR% (3s)</b> = 3-sec video views ÷ impressions · <b>VR% (Thruplay)</b> = thruplays ÷ impressions · <b>ER%</b> = engagement ÷ impressions · <b>CTR</b> = clicks ÷ impressions · <b>Frequency</b> = impressions ÷ reach · <b>Outbound CTR</b> = ยังไม่ได้ตั้ง field
       </div>`;
