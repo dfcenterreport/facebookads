@@ -366,7 +366,7 @@
         <div class="pill" data-v="last_14d">14 วัน</div>
         <div class="pill" data-v="last_30d">30 วัน</div>
         <div class="pill" data-v="this_month">เดือนนี้</div>
-        <div class="pill" data-v="last_month">เดือนก่อน</div>
+        <div class="pill active" data-v="last_month">เดือนก่อน</div>
       </div>
       <div class="range">
         <input type="date" id="bidDFrom" title="วันเริ่มต้น">
@@ -950,8 +950,8 @@ function toggleRow(i){
 function sortBy(k){ if(sortKey===k) sortDir*=-1; else {sortKey=k; sortDir=-1;} render(); }
 
 /* ---------------- BIDDABLE — creative monitor (เจาะบัญชี + แคมเปญ) ---------------- */
-let bidRaw=[], bidAccount="__all__", bidCampaign="", bidPreset="custom", bidFrom="", bidTo="", bidLoaded=false, bidChart=null, bidNoImg=false, bidAuto=true;
-(function(){ const n=new Date(),y=n.getFullYear(),m=n.getMonth(); const f=d=>`${d.getFullYear()}-${String(d.getMonth()+1).padStart(2,"0")}-${String(d.getDate()).padStart(2,"0")}`; bidFrom=f(new Date(y,m-1,1)); bidTo=f(new Date(y,m,0)); })();  // default = เดือนก่อน (previous month)
+let bidRaw=[], bidAccount="__all__", bidCampaign="", bidPreset="last_month", bidFrom="", bidTo="", bidLoaded=false, bidChart=null, bidNoImg=false, bidAuto=true;
+(function(){ const n=new Date(),y=n.getFullYear(),m=n.getMonth(); const f=d=>`${d.getFullYear()}-${String(d.getMonth()+1).padStart(2,"0")}-${String(d.getDate()).padStart(2,"0")}`; bidFrom=f(new Date(y,m-1,1)); bidTo=f(new Date(y,m,0)); })();  // เติมค่า input = เดือนก่อน (default ใช้ preset last_month ซึ่งเร็วกว่า)
 function bidRange(){ return bidPreset==="custom" ? `date_from=${bidFrom}&date_to=${bidTo}` : `date_preset=${bidPreset}`; }
 let bidCreatives=[], bidSel=-1;
 let orgPosts=[], orgTier=-1;   // โพสต์จาก facebook_organic (Page Insights)
