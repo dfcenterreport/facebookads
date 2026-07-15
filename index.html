@@ -1591,6 +1591,19 @@ function parseCampaign(name){
   const projectName=segs[0]||"";
   return {brand:normalizeBrand(core,projectName), objective, material};
 }
+
+// TikTok/template-based: objective = ส่วนที่ 2 ตรงตามชื่อ (ไม่ใช่ keyword),
+// material type = detect เฉพาะจาก Material Name (ส่วนที่ 3+) ; ไม่เจอ = Unknown
+function parseCampaignTT(name){
+  const core=String(name||"").split(" / ")[0];
+  const afterCode=core.replace(/^[^\[]*\[[^\]]*\]\s*/,"");
+  const noTail=afterCode.replace(/\s*\[[^\]]*\]/g,"").replace(/\s*\([^)]*\)\s*$/,"").trim();
+  const segs=noTail.split(" - ").map(x=>x.trim()).filter(Boolean);
+  const objective=(segs[1]||"").trim()||"Unknown";
+  let material=detectMaterial(segs.slice(2).join(" - "));
+  if(material==="(ไม่ระบุ)") material="Unknown";
+  return {brand:normalizeBrand(core,segs[0]||""), objective, material};
+}
 function bnum(r, keys){ for(const k of keys){ const v=r[k]; if(v!=null&&v!=="") return +v||0; } return 0; }
 
 async function loadBenchmark(){
@@ -1672,7 +1685,7 @@ async function loadBenchmarkTT(){
     if(data===null) throw new Error(`Windsor (tiktok) ไม่ตอบ/ปฏิเสธทุกชุด field (HTTP ${lastStatus}: ${lastBody||"—"})`);
     benchRawTT=data.map(r=>{
       const name=r.campaign||r.campaign_name||"(ไม่ระบุแคมเปญ)";
-      const p=parseCampaign(name);
+      const p=parseCampaignTT(name);
       return { campaign:name, brand:p.brand, objective:p.objective, material:p.material,
         spend:+r.spend||0, impressions:+r.impressions||0, reach:+r.reach||0, clicks:+r.clicks||0,
         video:bnum(r,["play_duration_2s"]), v6s:bnum(r,["play_duration_6s"]), v15s:bnum(r,["focused_view_15s"]),
