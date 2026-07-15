@@ -1767,7 +1767,7 @@ function renderBenchmark(){
       <td class="rn">${i+1}</td>
       <td class="camp" title="${esc(c.campaign)}">${c.campaign}</td>
       <td class="txt">${c.brand}</td><td class="camp">${c.material}</td>
-      <td class="num">${fmtMoney(c.spend)}</td>${cell(c._cost.cpm)}${cell(c._cost.cpc)}</tr>`).join("");
+      <td class="num">${fmtMoney(c.spend)}</td>${cell(c._cost.cpm)}${cell(c._cost.cpv)}${cell(c._cost.cpc)}</tr>`).join("");
     cont.innerHTML=`
       <div class="panel bench-panel">
         <div class="panel-head"><h3>Cost Per Result by Brand — TikTok</h3><span class="bench-count">${brands.length} แบรนด์ · ${camps.length} แคมเปญ · เลื่อนดูได้</span></div>
@@ -1782,7 +1782,7 @@ function renderBenchmark(){
       <div class="panel bench-panel">
         <div class="panel-head"><h3>Campaign — TikTok</h3><span class="bench-count">${camps.length} แคมเปญ (เรียงตาม Spend · เลื่อนดูได้)</span></div>
         <div class="bench-scroll"><table class="bench"><thead><tr>
-          <th class="rn">#</th><th>Campaign</th><th>Brand</th><th>Material type</th><th>Spend</th><th>CPM</th><th>CPC</th>
+          <th class="rn">#</th><th>Campaign</th><th>Brand</th><th>Material type</th><th>Spend</th><th>CPM</th><th>CPV</th><th>CPC</th>
         </tr></thead><tbody>${campRows}</tbody></table></div>
       </div>
       <div class="bench-legend">
