@@ -91,6 +91,9 @@
   .ms-opt:hover{background:var(--well)}
   .ms-opt input{cursor:pointer;margin:0}
   .ms-all{border-bottom:1px solid var(--border);border-radius:0;margin-bottom:2px;font-weight:600}
+  /* override .bench-filters label (flex-direction:column) → checkbox อยู่หน้าชื่อ (แนวนอน) */
+  .bench-filters .ms-opt{flex-direction:row;align-items:center;text-transform:none;font-size:13px;font-weight:400;letter-spacing:normal;color:var(--text)}
+  .bench-filters .ms-all{font-weight:600}
   .bench-panel{margin-bottom:22px;box-shadow:0 1px 3px rgba(16,24,40,.05),0 1px 2px rgba(16,24,40,.03)}
   .bench-count{color:var(--muted);font-size:12px;font-weight:500}
 
