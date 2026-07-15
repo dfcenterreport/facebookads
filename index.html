@@ -1258,26 +1258,37 @@ function bidEnsurePptx(){
   bidPptxLoading=new Promise((res,rej)=>{ const s=document.createElement("script"); s.src="https://cdn.jsdelivr.net/npm/pptxgenjs@3.12.0/dist/pptxgen.bundle.js"; s.onload=()=>res(); s.onerror=()=>rej(new Error("โหลด PptxGenJS ไม่ได้")); document.head.appendChild(s); });
   return bidPptxLoading;
 }
-function bidFmtDate(v){ if(v==null||v==="") return "—"; if(typeof v==="number"){ const d=new Date(v>1e12?v:v*1000); return isNaN(d.getTime())?String(v):d.toUTCString(); } return String(v); }
+function bidFmtDate(v){ if(v==null||v===""||v===0) return "—"; if(typeof v==="number"){ const d=new Date(v>1e12?v:v*1000); return isNaN(d.getTime())?"—":d.toUTCString(); } const d=new Date(v); return isNaN(d.getTime())?String(v):d.toUTCString(); }
+// pool: รัน worker พร้อมกันสูงสุด conc ตัว (เร่งความเร็ว)
+async function bidPool(items, worker, conc){
+  conc=conc||6; const out=new Array(items.length); let idx=0;
+  const run=async()=>{ while(idx<items.length){ const i=idx++; try{ out[i]=await worker(items[i],i); }catch(e){ out[i]=null; } } };
+  await Promise.all(Array.from({length:Math.min(conc,items.length||1)},run));
+  return out;
+}
+// ดึงรูป thumbnail ผ่าน proxy (same-origin) → dataURL ; ล้มเหลว = null
+async function bidImgData(thumb){
+  if(!thumb) return null;
+  const src=(location.protocol==="http:"||location.protocol==="https:")?("/api/img?url="+encodeURIComponent(thumb)):thumb;
+  try{ const r=await fetch(src); if(!r.ok) return null; const b=await r.blob(); if(!/^image\//.test(b.type)) return null;
+    return await new Promise(res=>{ const fr=new FileReader(); fr.onload=()=>res(fr.result); fr.onerror=()=>res(null); fr.readAsDataURL(b); }); }
+  catch(e){ return null; }
+}
 function bidPerfData(c){
   const post=matchOrgPost(c);
   const link=(post&&post.permalink)||c.link||"";
   const ap=(link && apifyCache[link] && apifyCache[link]!=="loading")?apifyCache[link]:null;
   const pick=(apKeys,winVal)=>{ if(ap){ for(const k of apKeys){ if(ap[k]!=null&&ap[k]!=="") return +ap[k]||0; } } return winVal!=null?winVal:null; };
+  const rawPick=(keys)=>{ if(ap){ for(const k of keys){ if(ap[k]!=null&&ap[k]!=="") return ap[k]; } } return null; };
   const totReach=c.reach, totImpr=c.impressions;
   const R = post ? {tr:post.reach||totReach, or:null, pr:null, ti:post.impr||totImpr, oi:post.imprOrg, pi:post.imprPaid}
                  : {tr:totReach, or:null, pr:totReach, ti:totImpr, oi:null, pi:totImpr};
   return {
-    name:c.ad, page: bidAccount==="__all__"?(bidCampaign||c.adset||"—"):bidAccount,
+    name:c.ad, page: bidAccount==="__all__"?(bidCampaign||c.adset||"—"):bidAccount, thumb:c.thumb||"",
     link, type:c.thumb?"Photo":"—",
-    postDate: pick(["time","date","timestamp","publishedTime","postedAt"], null),
+    postDate: rawPick(["time","date","timestamp","publishedTime","postedAt"]),
     reachTotal:R.tr, reachOrg:R.or, reachPaid:R.pr, imprTotal:R.ti, imprOrg:R.oi, imprPaid:R.pi,
     like:pick(["likes","reactionLikeCount","reactionsCount"], post?post.like:null),
-    love:pick(["reactionLoveCount","loveCount"], post?post.love:null),
-    haha:pick(["reactionHahaCount","hahaCount"], post?post.haha:null),
-    wow:pick(["reactionWowCount","wowCount"], post?post.wow:null),
-    sad:pick(["reactionSadCount","sadCount"], post?post.sad:null),
-    angry:pick(["reactionAngryCount","angryCount"], post?post.angry:null),
     share:pick(["shares","shareCount","sharesCount"], null),
     comment:pick(["comments","commentCount","commentsCount"], null),
     postClick:(post&&post.clicks)?post.clicks:c.clicks
@@ -1288,24 +1299,28 @@ async function bidGenReport(){
   const btn=document.getElementById("bidGenReport"), orig=btn.textContent; btn.disabled=true;
   try{
     btn.textContent="⏳ โหลดตัวสร้าง PPT…"; await bidEnsurePptx();
-    // ดึง Apify (reactions/share/comment) ให้ครบทุกโพสต์ก่อน
+    // ดึง Apify แบบขนาน (เร็วขึ้น)
     const links=[...new Set(bidCreatives.map(c=>{ const p=matchOrgPost(c); return (p&&p.permalink)||c.link||""; }).filter(Boolean))];
-    for(let i=0;i<links.length;i++){ const l=links[i];
-      if(apifyCache[l]===undefined || apifyCache[l]==="loading"){ btn.textContent=`⏳ ดึงข้อมูลโพสต์ ${i+1}/${links.length}…`; try{ apifyCache[l]=await fetchApify(l); }catch(e){ apifyCache[l]=null; } }
-    }
-    btn.textContent="⏳ สร้างสไลด์…"; bidBuildPptx();
+    let ad=0; btn.textContent=`⏳ ดึงข้อมูลโพสต์ 0/${links.length}…`;
+    await bidPool(links, async(l)=>{ if(apifyCache[l]===undefined||apifyCache[l]==="loading"){ try{ apifyCache[l]=await fetchApify(l); }catch(e){ apifyCache[l]=null; } } ad++; btn.textContent=`⏳ ดึงข้อมูลโพสต์ ${ad}/${links.length}…`; }, 8);
+    // ดึงรูปแบบขนาน
+    btn.textContent="⏳ ดึงรูปภาพ…";
+    const imgs=await bidPool(bidCreatives, c=>bidImgData(c.thumb), 8);
+    btn.textContent="⏳ สร้างสไลด์…"; bidBuildPptx(imgs);
     btn.textContent="✓ ดาวน์โหลดแล้ว"; setTimeout(()=>{ btn.textContent=orig; btn.disabled=false; },2500);
   }catch(e){ alert("สร้างรายงานไม่สำเร็จ: "+e.message); btn.textContent=orig; btn.disabled=false; }
 }
-function bidBuildPptx(){
+function bidBuildPptx(imgs){
   const pptx=new PptxGenJS(); pptx.defineLayout({name:"W",width:13.333,height:7.5}); pptx.layout="W";
   const INK="1A1A1B", MUT="6B7178", BOX="F2F3F4", LINE="E2E4E6";
   const fI=v=>(v==null)?"—":Math.round(v).toLocaleString("en-US");
   const mx=4.0, mw=9.0;
-  bidCreatives.forEach(c=>{
+  bidCreatives.forEach((c,ci)=>{
     const d=bidPerfData(c), s=pptx.addSlide();
     s.addText("Performance for your post",{x:0.4,y:0.3,w:12.5,h:0.5,fontSize:22,bold:true,color:INK});
-    s.addText(String(d.name||""),{x:0.4,y:1.0,w:3.3,h:5.5,fontSize:11,color:MUT,valign:"top"});
+    const im=imgs&&imgs[ci];
+    if(im){ try{ s.addImage({data:im,x:0.4,y:1.0,w:3.2,h:3.2,sizing:{type:"contain",w:3.2,h:3.2}}); }catch(e){} }
+    s.addText(String(d.name||""),{x:0.4,y:im?4.35:1.0,w:3.3,h:1.6,fontSize:10,color:MUT,valign:"top"});
     const meta=[["Page name:",d.page],["Link Post:",d.link||"—"],["Type:",d.type],["Post Message:",bidFmtDate(d.postDate)]];
     let y=1.0;
     meta.forEach(([k,v])=>{ s.addText([{text:k+" ",options:{bold:true,color:INK}},{text:String(v),options:{color:MUT}}],{x:mx,y,w:mw,h:0.3,fontSize:11,valign:"middle"}); y+=0.34; });

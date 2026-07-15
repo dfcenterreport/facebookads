@@ -54,6 +54,25 @@ app.get("/api/apify", async (req, res) => {
   }
 });
 
+// Image proxy — ดึงรูป thumbnail (FB/IG CDN) มาแบบ same-origin เพื่อฝังใน PPT (เลี่ยง CORS)
+app.get("/api/img", async (req, res) => {
+  const url = req.query.url;
+  if (!url || !/^https:\/\//i.test(url)) return res.status(400).end();
+  let host = "";
+  try { host = new URL(url).hostname; } catch (e) { return res.status(400).end(); }
+  if (!/(fbcdn\.net|cdninstagram\.com|facebook\.com|akamaihd\.net|scontent)/i.test(host)) return res.status(403).end();
+  try {
+    const r = await fetch(url);
+    const ct = r.headers.get("content-type") || "";
+    if (!/^image\//i.test(ct)) return res.status(415).end();
+    res.set("content-type", ct);
+    res.set("cache-control", "public, max-age=86400");
+    res.send(Buffer.from(await r.arrayBuffer()));
+  } catch (e) {
+    res.status(502).end();
+  }
+});
+
 app.use(express.static(__dirname));
 app.get("*", (_req, res) => res.sendFile(path.join(__dirname, "index.html")));
 
