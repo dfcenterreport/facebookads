@@ -1557,6 +1557,22 @@ const OBJ_RULES=[
 ];
 function detectObjective(str){ for(const [re,o] of OBJ_RULES){ if(re.test(str)) return o; } return "(ไม่ระบุ)"; }
 
+// TikTok objective — controlled list (map จากส่วนที่ 2 ของชื่อ) ; ตัวแรกที่ match ชนะ
+const TT_OBJ_RULES=[
+  [/video\s*views?\s*6\s*s|views?\s*6\s*s/i,"Video Views 6s"],
+  [/video\s*views?/i,"Video Views"],
+  [/profile\s*visit/i,"Profile Visit"],
+  [/product\s*sale/i,"Product Sale"],
+  [/conversion/i,"Conversions"],
+  [/\btraffic\b/i,"Traffic"],
+  [/follow/i,"Follow"],
+  [/r\s*&\s*f|reach\s*&\s*freq/i,"R&F"],
+  [/top\s*view/i,"Top View"],
+  [/top\s*feed/i,"Top Feed"],
+  [/\breach\b/i,"Reach"]
+];
+function detectObjectiveTT(str){ for(const [re,o] of TT_OBJ_RULES){ if(re.test(str)) return o; } return "Unknown"; }
+
 // Material type: ตรวจว่าชื่อ contain keyword ไหน → ชื่อมาตรฐาน (ตัวแรกที่ match ชนะ)
 const MAT_RULES=[
   [/7\.5\s*(?:s|sec)/i,"VDO 7.5s"],
@@ -1599,7 +1615,7 @@ function parseCampaignTT(name){
   const afterCode=core.replace(/^[^\[]*\[[^\]]*\]\s*/,"");
   const noTail=afterCode.replace(/\s*\[[^\]]*\]/g,"").replace(/\s*\([^)]*\)\s*$/,"").trim();
   const segs=noTail.split(" - ").map(x=>x.trim()).filter(Boolean);
-  const objective=(segs[1]||"").trim()||"Unknown";
+  const objective=detectObjectiveTT(segs[1]||"");
   let material=detectMaterial(segs.slice(2).join(" - "));
   if(material==="(ไม่ระบุ)") material="Unknown";
   return {brand:normalizeBrand(core,segs[0]||""), objective, material};
