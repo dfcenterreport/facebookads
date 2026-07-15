@@ -378,6 +378,7 @@
     <div class="pill active" data-m="cost">FB Cost per</div>
     <div class="pill" data-m="rate">FB Result Rate</div>
     <div class="pill" data-m="ttcost">TT Cost per</div>
+    <div class="pill" data-m="ttrate">TT Result Rate</div>
   </div>
   <div class="bench-filters">
     <label>Objective<select id="benchFObjective"><option value="">— ทั้งหมด —</option></select></label>
@@ -1486,7 +1487,7 @@ document.getElementById("backBtn").onclick=showLanding;
 let benchRaw=[], benchLoaded=false, benchFrom="2025-01-01", benchTo="", benchMode="cost";
 let benchRawTT=[], benchTTLoaded=false;   // TikTok data
 const benchFilter={objective:"",brand:"",material:""};
-function benchActive(){ return benchMode==="ttcost" ? benchRawTT : benchRaw; }
+function benchActive(){ return benchMode.startsWith("tt") ? benchRawTT : benchRaw; }
 
 // base field ที่ชัวร์ + ชุด result เสริม (best-effort, ไล่ fallback ถ้า Windsor ปฏิเสธ field)
 // ไม่ใส่ date → Windsor รวมยอดต่อแคมเปญให้เลย (แถวน้อยลงมาก เร็วขึ้น ไม่ timeout)
@@ -1716,7 +1717,9 @@ function renderBenchmark(){
     cpatc:c.atc?c.spend/c.atc:0, cppur:c.purchase?c.spend/c.purchase:0,
     // --- Result Rate (อัตราต่อ impressions) ---
     vr3:im?c.video/im:0, vrtp:im?c.thruplay/im:0, ctr:im?c.clicks/im:0,
-    er:im?c.engage/im:0, freq:c.reach?im/c.reach:0, octr:0 /* Outbound CTR: ยังไม่มี field */ }; });
+    er:im?c.engage/im:0, freq:c.reach?im/c.reach:0, octr:0, /* Outbound CTR: ยังไม่มี field */
+    // TikTok result rate (2s/6s/15s ÷ impressions)
+    vr2:im?c.video/im:0, vr6:im?c.v6s/im:0, vr15:im?c.v15s/im:0 }; });
 
   const byBrand={}; camps.forEach(c=>{ (byBrand[c.brand]=byBrand[c.brand]||[]).push(c); });
   const brands=Object.keys(byBrand).sort((a,b)=>a.localeCompare(b));
@@ -1731,6 +1734,7 @@ function renderBenchmark(){
   const RATE=[{k:"vr3",l:"VR% (3s)",f:fPct,hi:1},{k:"vrtp",l:"VR% (Thruplay)",f:fPct,hi:1},{k:"ctr",l:"CTR",f:fPct,hi:1},{k:"er",l:"ER%",f:fPct,hi:1},{k:"freq",l:"Frequency",f:fNum},{k:"octr",l:"Outbound CTR",f:fPct,hi:1}];
   const TT_MAIN=[{k:"cpm",l:"CPM",f:fMoney},{k:"cpr",l:"CPR / 1K reach",f:fMoney},{k:"cpc",l:"CPC",f:fMoney},{k:"freq",l:"Frequency",f:fNum}];
   const TT_VIDEO=[{k:"cpv",l:"CPV",f:fMoney},{k:"cpv6",l:"CPV (6s)",f:fMoney},{k:"cpv15",l:"CPV (15s)",f:fMoney}];
+  const TT_RATE=[{k:"vr2",l:"VR% (2s)",f:fPct,hi:1},{k:"vr6",l:"VR% (6s)",f:fPct,hi:1},{k:"vr15",l:"VR% (15s)",f:fPct,hi:1},{k:"ctr",l:"CTR",f:fPct,hi:1},{k:"freq",l:"Frequency",f:fNum}];
   const cell=(v,f)=> (v==null||!v||!isFinite(v))?'<td class="na">—</td>':`<td class="num">${(f||fMoney)(v)}</td>`;
 
   const brandSpend=b=>byBrand[b].reduce((s,c)=>s+c.spend,0);
@@ -1787,6 +1791,31 @@ function renderBenchmark(){
       </div>
       <div class="bench-legend">
         * TikTok · <b>CPM</b> = spend ÷ impressions ×1000 · <b>CPR</b> = spend ÷ 1,000 reach · <b>CPC</b> = spend ÷ clicks · <b>Frequency</b> = impressions ÷ reach · <b>CPV</b> = spend ÷ play 2s · <b>CPV (6s)</b> = spend ÷ play 6s · <b>CPV (15s)</b> = spend ÷ focused view 15s
+      </div>`;
+    return;
+  }
+
+  if(benchMode==="ttrate"){
+    const tier=s=>s>=100000?"100K+":s>=10000?"10K+":s>=1000?"1K+":"<1K";
+    const campRows=campSorted.map((c,i)=>`<tr>
+      <td class="rn">${i+1}</td>
+      <td class="camp" title="${esc(c.campaign)}">${c.campaign}</td>
+      <td class="txt">${c.brand}</td><td class="camp">${c.material}</td><td class="txt">${tier(c.spend)}</td>
+      ${cell(c._cost.vr2,fPct)}${cell(c._cost.vr6,fPct)}${cell(c._cost.vr15,fPct)}${cell(c._cost.ctr,fPct)}${cell(c._cost.freq,fNum)}</tr>`).join("");
+    cont.innerHTML=`
+      <div class="panel bench-panel">
+        <div class="panel-head"><h3>Result Rate by Brand — TikTok</h3><span class="bench-count">${brands.length} แบรนด์ · ${camps.length} แคมเปญ · เลื่อนดูได้</span></div>
+        <div class="psub">🟢 สูง (ดี) → 🔴 ต่ำ · VR% = play ÷ impressions ×100 · CTR = clicks ÷ impressions · Frequency = impressions ÷ reach</div>
+        ${brandTable(TT_RATE)}
+      </div>
+      <div class="panel bench-panel">
+        <div class="panel-head"><h3>Campaign — TikTok</h3><span class="bench-count">${camps.length} แคมเปญ (เรียงตาม Spend · เลื่อนดูได้)</span></div>
+        <div class="bench-scroll"><table class="bench"><thead><tr>
+          <th class="rn">#</th><th>Campaign</th><th>Brand</th><th>Material type</th><th>Spend tier</th><th>VR% (2s)</th><th>VR% (6s)</th><th>VR% (15s)</th><th>CTR</th><th>Frequency</th>
+        </tr></thead><tbody>${campRows}</tbody></table></div>
+      </div>
+      <div class="bench-legend">
+        * TikTok · <b>VR% (2s)</b> = play 2s ÷ impressions · <b>VR% (6s)</b> = play 6s ÷ impressions · <b>VR% (15s)</b> = focused view 15s ÷ impressions · <b>CTR</b> = clicks ÷ impressions · <b>Frequency</b> = impressions ÷ reach
       </div>`;
     return;
   }
@@ -1857,7 +1886,7 @@ document.getElementById("topNav").onclick=e=>{
     if(view==="activeacct" && !activeAcctData.length) loadActiveAccounts();
     if(view==="activeacct" && !acctMonthlyLoaded) loadMonthlyTrend();
     if(view==="biddable" && !bidLoaded) loadBiddable();
-    if(view==="benchmark"){ const isTT=benchMode==="ttcost"; if(isTT&&!benchTTLoaded) loadBenchmarkTT(); else if(!isTT&&!benchLoaded) loadBenchmark(); }
+    if(view==="benchmark"){ const isTT=benchMode.startsWith("tt"); if(isTT&&!benchTTLoaded) loadBenchmarkTT(); else if(!isTT&&!benchLoaded) loadBenchmark(); }
   }else{
     SIDE_VIEWS.forEach(v=>document.getElementById(v+"View").style.display="none");
     if(viewBeforeSide==="dashboard") document.getElementById("dashboardView").style.display="block";
@@ -1885,7 +1914,7 @@ document.getElementById("benchModeTabs").onclick=e=>{
   document.querySelectorAll("#benchModeTabs .pill").forEach(x=>x.classList.remove("active"));
   p.classList.add("active"); benchMode=p.dataset.m;
   benchFilter.objective=benchFilter.brand=benchFilter.material="";   // reset ตัวกรองตอนสลับแหล่งข้อมูล
-  const isTT=benchMode==="ttcost";
+  const isTT=benchMode.startsWith("tt");
   if(isTT && !benchTTLoaded){ loadBenchmarkTT(); return; }
   if(!isTT && !benchLoaded){ loadBenchmark(); return; }
   populateBenchFilters(); renderBenchmark();
