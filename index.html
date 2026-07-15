@@ -1515,8 +1515,8 @@ const benchEsc=s=>String(s==null?"":s).replace(/&/g,"&amp;").replace(/</g,"&lt;"
 // ไม่ใส่ date → Windsor รวมยอดต่อแคมเปญให้เลย (แถวน้อยลงมาก เร็วขึ้น ไม่ timeout)
 const BENCH_BASE="account_name,campaign,spend,impressions,reach,clicks";
 const BENCH_OPT_TIERS=[
-  "cost_per_action_type_video_view,cost_per_thruplay_video_view,cost_per_action_type_page_engagement,actions_omni_add_to_cart,actions_omni_purchase,actions_omni_view_content,actions_onsite_conversion_messaging_conversation_started_7d",
-  "cost_per_action_type_video_view,cost_per_thruplay_video_view,cost_per_action_type_page_engagement",
+  "cost_per_action_type_video_view,cost_per_thruplay_video_view,cost_per_action_type_page_engagement,outbound_clicks_outbound_click,actions_omni_add_to_cart,actions_omni_purchase,actions_omni_view_content,actions_onsite_conversion_messaging_conversation_started_7d",
+  "cost_per_action_type_video_view,cost_per_thruplay_video_view,cost_per_action_type_page_engagement,outbound_clicks_outbound_click",
   "video_views,post_engagement",
   ""
 ];
@@ -1680,6 +1680,7 @@ async function loadBenchmark(){
         brand:p.brand, objective:p.objective, material:p.material,
         spend:sp, impressions:+r.impressions||0, reach:+r.reach||0, clicks:+r.clicks||0,
         video:fromCost(["cost_per_action_type_video_view"],["video_views","video_view","actions_video_view"]), v6s:0, v15s:0,
+        octrc:bnum(r,["outbound_clicks_outbound_click","outbound_clicks"]),
         thruplay:fromCost(["cost_per_thruplay_video_view"],["video_thruplay_watched_actions","thruplays","thruplay"]),
         engage:fromCost(["cost_per_action_type_page_engagement"],["post_engagement","post_engagements","page_engagement"]),
         msg:bnum(r,["actions_onsite_conversion_messaging_conversation_started_7d","actions_onsite_conversion_messaging_conversation_started"]),
@@ -1770,7 +1771,7 @@ async function loadBenchmarkTT(){
       return { campaign:name, brand:p.brand, objective:p.objective, material:p.material,
         spend:+r.spend||0, impressions:+r.impressions||0, reach:+r.reach||0, clicks:+r.clicks||0,
         video:bnum(r,["play_duration_2s"]), v6s:bnum(r,["play_duration_6s"]), v15s:bnum(r,["focused_view_15s"]),
-        thruplay:0, engage:0, msg:0, atc:0, purchase:0, viewc:0 };
+        octrc:0, thruplay:0, engage:0, msg:0, atc:0, purchase:0, viewc:0 };
     });
     benchTTLoaded=true;
     document.getElementById("benchRangeLabel").textContent=`TikTok Cost per Result · ${from} → ${to} · ${benchRawTT.length} แถว`;
@@ -1821,10 +1822,10 @@ function renderBenchmark(){
   const cont=document.getElementById("benchmarkContent");
   if(!rows.length){ cont.innerHTML='<div class="bench-empty">ไม่พบข้อมูลตามตัวกรองที่เลือก</div>'; return; }
 
-  const METR=["spend","impressions","reach","clicks","video","v6s","v15s","thruplay","engage","msg","atc","purchase","viewc"];
+  const METR=["spend","impressions","reach","clicks","video","v6s","v15s","octrc","thruplay","engage","msg","atc","purchase","viewc"];
   const byCamp={};
   rows.forEach(r=>{
-    const c=byCamp[r.campaign]||(byCamp[r.campaign]={campaign:r.campaign,brand:r.brand,objective:r.objective,material:r.material,spend:0,impressions:0,reach:0,clicks:0,video:0,v6s:0,v15s:0,thruplay:0,engage:0,msg:0,atc:0,purchase:0,viewc:0});
+    const c=byCamp[r.campaign]||(byCamp[r.campaign]={campaign:r.campaign,brand:r.brand,objective:r.objective,material:r.material,spend:0,impressions:0,reach:0,clicks:0,video:0,v6s:0,v15s:0,octrc:0,thruplay:0,engage:0,msg:0,atc:0,purchase:0,viewc:0});
     METR.forEach(m=>c[m]+=(+r[m]||0));
   });
   const camps=Object.values(byCamp);
@@ -1836,7 +1837,7 @@ function renderBenchmark(){
     cpatc:c.atc?c.spend/c.atc:0, cppur:c.purchase?c.spend/c.purchase:0,
     // --- Result Rate (อัตราต่อ impressions) ---
     vr3:im?c.video/im:0, vrtp:im?c.thruplay/im:0, ctr:im?c.clicks/im:0,
-    er:im?c.engage/im:0, freq:c.reach?im/c.reach:0, octr:0, /* Outbound CTR: ยังไม่มี field */
+    er:im?c.engage/im:0, freq:c.reach?im/c.reach:0, octr:im?c.octrc/im:0,
     // TikTok result rate (2s/6s/15s ÷ impressions)
     vr2:im?c.video/im:0, vr6:im?c.v6s/im:0, vr15:im?c.v15s/im:0 }; });
 
@@ -1949,7 +1950,7 @@ function renderBenchmark(){
     cont.innerHTML=`
       <div class="panel bench-panel">
         <div class="panel-head"><h3>Result Rate by Brand</h3><span class="bench-count">${brands.length} แบรนด์ · ${camps.length} แคมเปญ · เลื่อนดูได้</span></div>
-        <div class="psub">🟢 สูง (ดี) → 🔴 ต่ำ · VR% / CTR / ER% = อัตราต่อ impressions · <b>Outbound CTR</b> ยังไม่ได้ตั้ง field (—)</div>
+        <div class="psub">🟢 สูง (ดี) → 🔴 ต่ำ · VR% / CTR / ER% / Outbound CTR = อัตราต่อ impressions</div>
         ${brandTable(RATE)}
       </div>
       <div class="panel bench-panel">
@@ -1960,7 +1961,7 @@ function renderBenchmark(){
       </div>
       ${benchRecoBlock(camps,byBrand,brands,RATE)}
       <div class="bench-legend">
-        * <b>VR% (3s)</b> = 3-sec video views ÷ impressions · <b>VR% (Thruplay)</b> = thruplays ÷ impressions · <b>ER%</b> = engagement ÷ impressions · <b>CTR</b> = clicks ÷ impressions · <b>Frequency</b> = impressions ÷ reach · <b>Outbound CTR</b> = ยังไม่ได้ตั้ง field
+        * <b>VR% (3s)</b> = 3-sec video views ÷ impressions · <b>VR% (Thruplay)</b> = thruplays ÷ impressions · <b>ER%</b> = engagement ÷ impressions · <b>CTR</b> = clicks ÷ impressions · <b>Frequency</b> = impressions ÷ reach · <b>Outbound CTR</b> = outbound clicks ÷ impressions
       </div>`;
     return;
   }
