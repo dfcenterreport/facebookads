@@ -1590,6 +1590,17 @@ const MAT_RULES=[
 ];
 function detectMaterial(str){ for(const [re,m] of MAT_RULES){ if(re.test(str)) return m; } return "(ไม่ระบุ)"; }
 
+// TikTok material — controlled list (เฉพาะ VDO types) ; ไม่เจอ = Unknown
+const TT_MAT_RULES=[
+  [/\b6\s*(?:s|sec)\b/i,"VDO 6s"],
+  [/\b15\s*(?:s|sec)\b/i,"VDO 15s"],
+  [/\b30\s*(?:s|sec)\b/i,"VDO 30s"],
+  [/\b45\s*(?:s|sec)\b/i,"VDO 45s"],
+  [/(?:>|over|เกิน|มากกว่า)\s*3\s*min|3\s*\+\s*min/i,"VDO >3 Mins"],
+  [/\b1\s*min/i,"VDO 1 Mins"]
+];
+function detectMaterialTT(str){ for(const [re,m] of TT_MAT_RULES){ if(re.test(str)) return m; } return "Unknown"; }
+
 function parseCampaign(name){
   const s=String(name||"");
   const core=s.split(" / ")[0];                              // ตัด "/ segment" ท้าย
@@ -1616,8 +1627,7 @@ function parseCampaignTT(name){
   const noTail=afterCode.replace(/\s*\[[^\]]*\]/g,"").replace(/\s*\([^)]*\)\s*$/,"").trim();
   const segs=noTail.split(" - ").map(x=>x.trim()).filter(Boolean);
   const objective=detectObjectiveTT(segs[1]||"");
-  let material=detectMaterial(segs.slice(2).join(" - "));
-  if(material==="(ไม่ระบุ)") material="Unknown";
+  const material=detectMaterialTT(segs.slice(2).join(" - "));
   return {brand:normalizeBrand(core,segs[0]||""), objective, material};
 }
 function bnum(r, keys){ for(const k of keys){ const v=r[k]; if(v!=null&&v!=="") return +v||0; } return 0; }
