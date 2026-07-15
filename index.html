@@ -139,18 +139,6 @@
   .bench-legend{font-size:12px;color:var(--muted);line-height:1.9;margin-top:6px}
   .bench-legend b{color:var(--text);font-weight:600}
   .bench-empty{padding:44px;text-align:center;color:var(--muted)}
-  /* Media Plan Gen AI */
-  .mp-upload{border:2px dashed var(--gray);border-radius:12px;padding:40px 20px;text-align:center;background:var(--well);transition:.15s;margin-bottom:20px}
-  .mp-upload.drag{border-color:var(--yellow);background:var(--yellow-tint)}
-  .mp-upicon{font-size:40px;margin-bottom:8px}
-  .mp-uptext{color:var(--muted);font-size:14px;margin-bottom:12px}
-  .mp-btn{display:inline-block;cursor:pointer}
-  .mp-hint{font-size:12px;color:var(--muted);margin-top:12px}
-  .mp-summary{display:flex;gap:12px;flex-wrap:wrap;align-items:center;margin-bottom:16px}
-  .mp-month-tabs{display:flex;gap:6px;flex-wrap:wrap;margin-bottom:14px}
-  .mp-mtab{padding:7px 14px;border:1px solid var(--border);border-radius:6px;cursor:pointer;font-size:13px;font-weight:600;background:var(--surface)}
-  .mp-mtab.active{background:var(--yellow);border-color:var(--yellow)}
-  .mp-err{padding:16px;border:1px solid var(--bad);border-radius:8px;color:var(--bad);background:#fff5f5;margin-bottom:16px}
   /* Google Looker Studio embed */
   .g-embed-bar{display:flex;justify-content:space-between;align-items:center;gap:14px;flex-wrap:wrap;margin-bottom:12px;font-size:13px;color:var(--muted)}
   .g-embed{width:100%;height:80vh;min-height:600px;border:1px solid var(--border);border-radius:10px;background:var(--surface)}
@@ -308,7 +296,6 @@
     <div class="topnav-tab active" data-view="app">Dashboard</div>
     <div class="topnav-tab" data-view="biddable">Creative Report</div>
     <div class="topnav-tab" data-view="benchmark">Ad Benchmark</div>
-    <div class="topnav-tab" data-view="mediaplan">Media Plan Gen AI</div>
     <div class="topnav-tab" data-view="activeacct">Active Ad account</div>
   </div>
 </nav>
@@ -420,23 +407,6 @@
     <label>Material type<div class="ms" id="msMaterial"></div></label>
   </div>
   <div id="benchmarkContent"><div class="loading">กำลังดึงข้อมูลจาก Windsor…</div></div>
-</section>
-
-<!-- ===================== MEDIA PLAN GEN AI ===================== -->
-<section id="mediaplanView" style="display:none">
-  <div class="bid-head">
-    <div>
-      <h1>🧠 Media Plan <span class="accent">Gen AI</span></h1>
-      <div class="sub">อัปโหลด Master plan (.xlsx) → ระบบเข้าใจโครงสร้างแล้วสร้าง Media plan รายเดือน (FEFL) ให้ดาวน์โหลด</div>
-    </div>
-  </div>
-  <div class="mp-upload" id="mpDrop">
-    <div class="mp-upicon">📄</div>
-    <div class="mp-uptext">ลากไฟล์ Master plan มาวาง หรือ</div>
-    <label class="btn-primary mp-btn">เลือกไฟล์ Master plan (.xlsx)<input type="file" id="mpFile" accept=".xlsx,.xls" hidden></label>
-    <div class="mp-hint">ระบบจะดึงเฉพาะ Digital On-Air (Facebook / TikTok / Line) แยกตามเดือน</div>
-  </div>
-  <div id="mpContent"></div>
 </section>
 
 <!-- ===================== ACTIVE AD ACCOUNT ===================== -->
