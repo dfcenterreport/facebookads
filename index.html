@@ -1333,7 +1333,7 @@ function bidBuildPptx(imgs){
       });
       y+=Math.ceil(cells.length/3)*(ch+gap)+0.12;
     };
-    section("Reach & Impressions",[[d.reachTotal,"Lifetime Post Total reach"],[d.reachOrg,"Lifetime Post Organic reach"],[d.reachPaid,"Lifetime Post Paid reach"],[d.imprTotal,"Lifetime Post Total impression"],[d.imprOrg,"Lifetime Post Organic impression"],[d.imprPaid,"Lifetime Post Paid impression"]]);
+    section("Reach & Impressions",[[d.reachTotal,"Reach"],[d.imprTotal,"Impression"]]);
     section("Reactions",[[d.like,"Like"]]);
     section("Share Comments and Post Click",[[d.share,"Share"],[d.comment,"Comment"],[d.postClick,"Post Click"]]);
   });
@@ -1415,12 +1415,8 @@ function selectCreative(i){
 
           <div class="pp-sec">Reach &amp; Impressions</div>
           <div class="pp-box">
-            ${stat(num(R.tr),"Lifetime Post Total reach")}
-            ${stat(R.or==null?"":num(R.or),"Lifetime Post Organic reach",R.or==null)}
-            ${stat(num(R.pr),"Lifetime Post Paid reach")}
-            ${stat(num(R.ti),"Lifetime Post Total impression")}
-            ${stat(R.oi==null?"":num(R.oi),"Lifetime Post Organic impression",R.oi==null)}
-            ${stat(num(R.pi),"Lifetime Post Paid impression")}
+            ${stat(num(R.tr),"Reach")}
+            ${stat(num(R.ti),"Impression")}
           </div>
 
           <div class="pp-sec">Reactions</div>
