@@ -1534,8 +1534,16 @@ document.getElementById("bidApifyDebug").onclick=async()=>{
     try{
       const res=await fetch(`/api/apify?url=${encodeURIComponent(url)}`);
       const txt=await res.text();
-      html+=`<div style="margin-top:10px"><b>/api/apify</b> → HTTP ${res.status}<pre style="white-space:pre-wrap;font-size:11px;max-height:280px;overflow:auto;background:var(--well);padding:8px;border-radius:4px;margin-top:4px">${txt.slice(0,2500).replace(/&/g,"&amp;").replace(/</g,"&lt;")}</pre></div>`;
-      html+=`<div style="margin-top:6px;font-size:11px;color:var(--muted)">ดู field ในผลว่ามี likes / shares / comments (หรือ reactionLoveCount ฯลฯ) ไหม ถ้าชื่อไม่ตรง บอกผมได้เลย</div>`;
+      html+=`<div style="margin-top:10px"><b>/api/apify</b> → HTTP ${res.status}</div>`;
+      let item=null; try{ const j=JSON.parse(txt); item=Array.isArray(j)?j[0]:(j.data&&j.data[0])||j; }catch(e){}
+      if(item && typeof item==="object"){
+        const esc=s=>String(s).replace(/&/g,"&amp;").replace(/</g,"&lt;");
+        const rows=Object.keys(item).map(k=>{ let v=item[k],t=Array.isArray(v)?`array(${v.length})`:typeof v; let pv=Array.isArray(v)?`[${v.length} items]`:(v&&typeof v==="object"?"{…}":esc(String(v)).slice(0,60)); const hot=/like|react|comment|share|love|haha|wow|angry|sad/i.test(k); return `<tr style="${hot?'background:#FFFBE6;font-weight:600':''}"><td style="padding:2px 8px">${esc(k)}</td><td style="padding:2px 8px;color:var(--muted)">${t}</td><td style="padding:2px 8px">${pv}</td></tr>`; }).join("");
+        html+=`<div style="margin-top:8px;font-size:11px;color:var(--muted)">Field ทั้งหมดของโพสต์ (แถวเหลือง = เกี่ยวกับ like/comment/share) — screenshot ส่งมาได้เลย</div>`;
+        html+=`<div style="max-height:340px;overflow:auto;margin-top:4px"><table style="font-size:11px;width:100%"><thead><tr><th style="text-align:left;padding:2px 8px">field</th><th style="text-align:left;padding:2px 8px">type</th><th style="text-align:left;padding:2px 8px">value</th></tr></thead><tbody>${rows}</tbody></table></div>`;
+      } else {
+        html+=`<pre style="white-space:pre-wrap;font-size:11px;max-height:280px;overflow:auto;background:var(--well);padding:8px;border-radius:4px;margin-top:4px">${txt.slice(0,2500).replace(/&/g,"&amp;").replace(/</g,"&lt;")}</pre>`;
+      }
     }catch(e){ html+=`<div style="margin-top:10px">ERROR ${e.message}</div>`; }
   }
   box.innerHTML=html;
