@@ -950,8 +950,10 @@ function toggleRow(i){
 function sortBy(k){ if(sortKey===k) sortDir*=-1; else {sortKey=k; sortDir=-1;} render(); }
 
 /* ---------------- BIDDABLE — creative monitor (เจาะบัญชี + แคมเปญ) ---------------- */
-let bidRaw=[], bidAccount="__all__", bidCampaign="", bidPreset="last_month", bidFrom="", bidTo="", bidLoaded=false, bidChart=null, bidNoImg=false, bidAuto=true;
-(function(){ const n=new Date(),y=n.getFullYear(),m=n.getMonth(); const f=d=>`${d.getFullYear()}-${String(d.getMonth()+1).padStart(2,"0")}-${String(d.getDate()).padStart(2,"0")}`; bidFrom=f(new Date(y,m-1,1)); bidTo=f(new Date(y,m,0)); })();  // เติมค่า input = เดือนก่อน (default ใช้ preset last_month ซึ่งเร็วกว่า)
+let bidRaw=[], bidAccount="__all__", bidCampaign="", bidPreset="custom", bidFrom="", bidTo="", bidLoaded=false, bidChart=null, bidNoImg=false, bidAuto=true;
+// default = เดือนก่อน (custom range) เพราะ connector facebook ไม่รับ preset last_month
+function bidMonthRange(prev){ const n=new Date(),y=n.getFullYear(),m=n.getMonth(); const f=d=>`${d.getFullYear()}-${String(d.getMonth()+1).padStart(2,"0")}-${String(d.getDate()).padStart(2,"0")}`; return prev?{from:f(new Date(y,m-1,1)),to:f(new Date(y,m,0))}:{from:f(new Date(y,m,1)),to:f(new Date(y,m+1,0))}; }
+(function(){ const r=bidMonthRange(true); bidFrom=r.from; bidTo=r.to; })();
 function bidRange(){ return bidPreset==="custom" ? `date_from=${bidFrom}&date_to=${bidTo}` : `date_preset=${bidPreset}`; }
 let bidCreatives=[], bidSel=-1;
 let orgPosts=[], orgTier=-1;   // โพสต์จาก facebook_organic (Page Insights)
@@ -1540,7 +1542,9 @@ document.getElementById("bidApifyDebug").onclick=async()=>{
 document.getElementById("bidDatePills").onclick=e=>{
   const p=e.target.closest(".pill"); if(!p) return;
   document.querySelectorAll("#bidDatePills .pill").forEach(x=>x.classList.remove("active"));
-  p.classList.add("active"); bidPreset=p.dataset.v;
+  p.classList.add("active"); const v=p.dataset.v;
+  if(v==="this_month"||v==="last_month"){ const r=bidMonthRange(v==="last_month"); bidFrom=r.from; bidTo=r.to; bidPreset="custom"; const fe=document.getElementById("bidDFrom"),te=document.getElementById("bidDTo"); if(fe)fe.value=bidFrom; if(te)te.value=bidTo; }
+  else bidPreset=v;   // last_7d/14d/30d = preset ที่ connector รองรับ
   bidLoaded=false; loadBiddable();
 };
 // เติมค่า date input เริ่มต้น = เดือนก่อน
