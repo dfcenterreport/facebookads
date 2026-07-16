@@ -971,7 +971,8 @@ async function fetchApify(url){
   }catch(e){ return null; }
 }
 // อ่านค่าจาก item ของ Apify แบบเผื่อชื่อ field หลายแบบ
-const apGet=(it,keys)=>{ for(const k of keys){ const v=it&&it[k]; if(v!=null && v!=="" && !isNaN(+v)) return +v; } return null; };  // ข้าม field ที่เป็น object/ไม่ใช่ตัวเลข
+// เลือกค่าที่ไม่ใช่ 0 ก่อน (กันเคส field แรกเป็น 0 แต่ค่าจริงอยู่ field ถัดไป) ; ข้าม object/ไม่ใช่ตัวเลข
+const apGet=(it,keys)=>{ let z=false; for(const k of keys){ const v=it&&it[k]; if(v!=null&&v!==""&&!isNaN(+v)){ const n=+v; if(n) return n; z=true; } } return z?0:null; };
 
 // ดึงข้อมูลโพสต์จริงจาก Page Insights (permalink + reactions + organic/paid) — ไม่บล็อกจอหลัก
 async function loadOrganic(){
@@ -1280,7 +1281,7 @@ function bidPerfData(c){
   const post=matchOrgPost(c);
   const link=(post&&post.permalink)||c.link||"";
   const ap=(link && apifyCache[link] && apifyCache[link]!=="loading")?apifyCache[link]:null;
-  const pick=(apKeys,winVal)=>{ if(ap){ for(const k of apKeys){ const v=ap[k]; if(v!=null&&v!==""&&!isNaN(+v)) return +v; } } return winVal!=null?winVal:null; };
+  const pick=(apKeys,winVal)=>{ if(ap){ let z=false; for(const k of apKeys){ const v=ap[k]; if(v!=null&&v!==""&&!isNaN(+v)){ const n=+v; if(n) return n; z=true; } } if(z) return 0; } return winVal!=null?winVal:null; };
   const rawPick=(keys)=>{ if(ap){ for(const k of keys){ if(ap[k]!=null&&ap[k]!=="") return ap[k]; } } return null; };
   const totReach=c.reach, totImpr=c.impressions;
   const R = post ? {tr:post.reach||totReach, or:null, pr:null, ti:post.impr||totImpr, oi:post.imprOrg, pi:post.imprPaid}
@@ -1291,8 +1292,8 @@ function bidPerfData(c){
     postDate: rawPick(["time","date","timestamp","publishedTime","postedAt"]),
     reachTotal:R.tr, reachOrg:R.or, reachPaid:R.pr, imprTotal:R.ti, imprOrg:R.oi, imprPaid:R.pi,
     like:pick(["likes","reactionLikeCount","reactionsCount"], post?post.like:null),
-    share:pick(["shares","shareCount","sharesCount","reshareCount","reshares"], null),
-    comment:pick(["comments","commentCount","commentsCount","topLevelCommentCount"], null),
+    share:pick(["shares","shareCount","sharesCount","share_count","shares_count","reshareCount","reshares"], null),
+    comment:pick(["comments","commentCount","commentsCount","comment_count","comments_count","topLevelCommentCount"], null),
     postClick:(post&&post.clicks)?post.clicks:c.clicks
   };
 }
@@ -1382,8 +1383,8 @@ function selectCreative(i){
     wow:   rv(["reactionWowCount","wowCount"], post?post.wow:null),
     sad:   rv(["reactionSadCount","sadCount"], post?post.sad:null),
     angry: rv(["reactionAngryCount","angryCount"], post?post.angry:null),
-    share: rv(["shares","shareCount","sharesCount","sharesCount","reshareCount","reshares"], null),
-    comment: rv(["comments","commentCount","commentsCount","commentsCountReduced","topLevelCommentCount"], null),
+    share: rv(["shares","shareCount","sharesCount","share_count","shares_count","reshareCount","reshares","sharesCountReduced"], null),
+    comment: rv(["comments","commentCount","commentsCount","comment_count","comments_count","topLevelCommentCount","commentsCountReduced"], null),
   };
   const imgTag=c.thumb
     ? `<img class="pp-img" src="${c.thumb}" alt="" onerror="this.className='pp-img ph';this.removeAttribute('src');this.textContent='🖼';">`
