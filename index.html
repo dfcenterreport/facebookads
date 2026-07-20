@@ -1769,10 +1769,17 @@ function parseCampaignTT(name){
 }
 function bnum(r, keys){ for(const k of keys){ const v=r[k]; if(v!=null&&v!=="") return +v||0; } return 0; }
 
-async function loadBenchmark(){
+// cache ใน localStorage (benchmark ข้อมูลย้อนหลัง ไม่ค่อยเปลี่ยน) — TTL 6 ชม.
+const BENCH_TTL=6*3600*1000;
+function benchCacheGet(k){ try{ const s=localStorage.getItem(k); if(!s) return null; const o=JSON.parse(s); if(Date.now()-o.ts>BENCH_TTL) return null; return o.data; }catch(e){ return null; } }
+function benchCacheSet(k,data){ try{ localStorage.setItem(k, JSON.stringify({ts:Date.now(),data})); }catch(e){} }
+
+async function loadBenchmark(force){
   if(!ensureKey(false)){ document.getElementById("benchmarkContent").innerHTML='<div class="error">ยังไม่มี API key — กดปุ่ม 🔑 Key</div>'; return; }
   const from=benchFrom, to=benchTo||new Date().toISOString().slice(0,10);
-  document.getElementById("benchmarkContent").innerHTML=`<div class="loading">กำลังดึงข้อมูลจาก Windsor… (${from} → ${to})</div>`;
+  const ck=`benchcache_fb_${from}_${to}`;
+  if(!force){ const c=benchCacheGet(ck); if(c){ benchRaw=c; benchLoaded=true; document.getElementById("benchRangeLabel").textContent=`Cost per Result แยกตามแบรนด์ · ${from} → ${to} · ${benchRaw.length} แถว · (จาก cache)`; populateBenchFilters(); renderBenchmark(); return; } }
+  document.getElementById("benchmarkContent").innerHTML=`<div class="loading">กำลังดึงข้อมูลจาก Windsor… (${from} → ${to}) · ช่วงยาวอาจใช้เวลาสักครู่</div>`;
   try{
     let data=null,lastStatus=0,lastBody="";
     for(const o of BENCH_OPT_TIERS){
@@ -1803,6 +1810,7 @@ async function loadBenchmark(){
         purchase:bnum(r,["actions_omni_purchase","actions_purchase"]),
         viewc:bnum(r,["actions_omni_view_content","actions_view_content"]) };
     });
+    benchCacheSet(ck, benchRaw);
     benchLoaded=true;
     document.getElementById("benchRangeLabel").textContent=`Cost per Result แยกตามแบรนด์ · ${from} → ${to} · ${benchRaw.length} แถว`;
     populateBenchFilters();
@@ -1865,10 +1873,12 @@ const TT_TIERS=[
   "campaign,spend,impressions,reach,clicks",
   "campaign_name,spend,impressions,clicks"
 ];
-async function loadBenchmarkTT(){
+async function loadBenchmarkTT(force){
   if(!ensureKey(false)){ document.getElementById("benchmarkContent").innerHTML='<div class="error">ยังไม่มี API key — กดปุ่ม 🔑 Key</div>'; return; }
   const from=benchFrom, to=benchTo||new Date().toISOString().slice(0,10);
-  document.getElementById("benchmarkContent").innerHTML=`<div class="loading">กำลังดึงข้อมูล TikTok จาก Windsor… (${from} → ${to})</div>`;
+  const ck=`benchcache_tt_${from}_${to}`;
+  if(!force){ const c=benchCacheGet(ck); if(c){ benchRawTT=c; benchTTLoaded=true; document.getElementById("benchRangeLabel").textContent=`TikTok Cost per Result · ${from} → ${to} · ${benchRawTT.length} แถว · (จาก cache)`; populateBenchFilters(); renderBenchmark(); return; } }
+  document.getElementById("benchmarkContent").innerHTML=`<div class="loading">กำลังดึงข้อมูล TikTok จาก Windsor… (${from} → ${to}) · ช่วงยาวอาจใช้เวลาสักครู่</div>`;
   try{
     let data=null,lastStatus=0,lastBody="";
     for(const f of TT_TIERS){
@@ -1888,6 +1898,7 @@ async function loadBenchmarkTT(){
         video:bnum(r,["play_duration_2s"]), v6s:bnum(r,["play_duration_6s"]), v15s:bnum(r,["focused_view_15s"]),
         octrc:0, thruplay:0, engage:0, msg:0, atc:0, purchase:0, viewc:0 };
     });
+    benchCacheSet(ck, benchRawTT);
     benchTTLoaded=true;
     document.getElementById("benchRangeLabel").textContent=`TikTok Cost per Result · ${from} → ${to} · ${benchRawTT.length} แถว`;
     populateBenchFilters();
@@ -2140,12 +2151,14 @@ document.getElementById("topNav").onclick=e=>{
   if(fEl) fEl.value=benchFrom;
   if(tEl) tEl.value=today;
 })();
-document.getElementById("benchRefresh").onclick=()=>{ benchLoaded=false; loadBenchmark(); };
+document.getElementById("benchRefresh").onclick=()=>{ if(isGoogleMode()){ renderGoogleEmbed(); return; } if(benchMode.startsWith("tt")){ benchTTLoaded=false; loadBenchmarkTT(true); } else { benchLoaded=false; loadBenchmark(true); } };
 document.getElementById("benchApply").onclick=()=>{
   const f=document.getElementById("benchFrom").value, t=document.getElementById("benchTo").value;
   if(!f||!t){ alert("กรุณาเลือกทั้งวันเริ่มต้นและวันสิ้นสุด"); return; }
   if(f>t){ alert("วันเริ่มต้นต้องไม่เกินวันสิ้นสุด"); return; }
-  benchFrom=f; benchTo=t; benchLoaded=false; loadBenchmark();
+  benchFrom=f; benchTo=t;
+  if(isGoogleMode()) return;
+  if(benchMode.startsWith("tt")){ benchTTLoaded=false; loadBenchmarkTT(); } else { benchLoaded=false; loadBenchmark(); }
 };
 document.getElementById("benchModeTabs").onclick=e=>{
   const p=e.target.closest(".pill"); if(!p) return;
