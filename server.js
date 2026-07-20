@@ -1,25 +1,206 @@
-// Tiny proxy + static server for the Windsor dashboard.
+// Windsor dashboard server: proxy + on-disk data store + Pull job.
 // - Serves index.html (static)
-// - /api/windsor proxies to Windsor (same-origin → no browser CORS issue)
-//   API key comes from the `Windsor_key` env var (set in Railway), or from the
-//   request header (x-windsor-key) as an override. It is never committed.
+// - /api/data       : serves stored (pulled) data, filtered by date  → หน้าเว็บอ่านจากตรงนี้ (เร็ว)
+// - /api/pull        : เริ่ม job ดึงข้อมูลล่าสุดจาก Windsor มาเก็บใน DB (ไฟล์บน volume)
+// - /api/pull/status : ความคืบหน้า + ETA ของ job ปัจจุบัน
+// - /api/pull/history: ประวัติการดึงข้อมูล
+// - /api/windsor     : proxy ตรงไป Windsor (เก็บไว้เผื่อ debug)
+// - /api/apify, /api/img : ตามเดิม
+// Windsor API key มาจาก env `Windsor_key` (ตั้งใน Railway) — ไม่ commit ลงไฟล์
 const express = require("express");
 const path = require("path");
+const fs = require("fs");
 
 const app = express();
+app.use(express.json());
 const PORT = process.env.PORT || 3000;
-// อนุญาตเฉพาะ connector ที่รู้จัก (กัน SSRF/พิมพ์ผิด) — ค่าเริ่มต้น "all"
+
+// โฟลเดอร์เก็บข้อมูล — บน Railway ให้ตั้ง env DATA_DIR ไปที่ mount ของ Volume (เช่น /data)
+const DATA_DIR = process.env.DATA_DIR || path.join(__dirname, "data");
+fs.mkdirSync(DATA_DIR, { recursive: true });
+
+// อนุญาตเฉพาะ connector ที่รู้จัก (กัน SSRF/พิมพ์ผิด)
 const ALLOWED_CONNECTORS = new Set(["all", "facebook", "facebook_organic", "instagram", "tiktok", "tiktok_organic", "twitter"]);
 
-app.get("/api/windsor", async (req, res) => {
-  const key = req.header("x-windsor-key") || process.env.Windsor_key || process.env.WINDSOR_API_KEY || "";
-  if (!key) return res.status(400).json({ error: "missing Windsor API key" });
+// connector ที่ Pull job จะดึงมาเก็บ + ชุด field (ไล่ระดับ ถ้า connector ไม่รองรับชุดใหญ่ค่อยถอย)
+const PULL_SOURCES = [
+  { key: "all", windsor: "all", tiers: [
+    "source,account_name,account_id,campaign,campaign_status,objective,clicks,spend,impressions,reach,date",
+    "source,account_name,account_id,campaign,spend,impressions,reach,clicks,date",
+  ]},
+  { key: "facebook", windsor: "facebook", tiers: [
+    "source,account_name,account_id,campaign,adset_name,ad_name,spend,impressions,reach,clicks,date,thumbnail_url,object_story_id,effective_object_story_id,permalink_url",
+    "source,account_name,account_id,campaign,adset_name,ad_name,spend,impressions,reach,clicks,date,thumbnail_url",
+    "source,account_name,account_id,campaign,adset_name,ad_name,spend,impressions,reach,clicks,date",
+  ]},
+  { key: "tiktok", windsor: "tiktok", tiers: [
+    "source,account_name,account_id,campaign,adset_name,ad_name,spend,impressions,reach,clicks,date",
+  ]},
+  { key: "facebook_organic", windsor: "facebook_organic", tiers: [
+    "date,post_id,permalink_url,message,post_impressions,post_impressions_organic,post_impressions_paid,post_impressions_unique,post_impressions_organic_unique,post_impressions_paid_unique,post_reactions_like_total,post_reactions_love_total,post_reactions_haha_total,post_reactions_wow_total,post_reactions_sorry_total,post_reactions_anger_total,post_clicks",
+    "date,post_id,permalink_url,message,post_impressions,post_impressions_unique,post_impressions_organic_unique,post_impressions_paid_unique",
+    "post_id,permalink_url,message",
+  ]},
+];
+const DATASET_KEYS = PULL_SOURCES.map(s => s.key);
+function datasetForConnector(connector) {
+  if (connector === "facebook_organic") return "facebook_organic";
+  if (connector === "facebook" || connector === "instagram") return "facebook";
+  if (connector === "tiktok" || connector === "tiktok_organic") return "tiktok";
+  return "all";
+}
 
+// ---------- in-memory store (โหลดจากดิสก์ตอนบูต) ----------
+const store = {};
+DATASET_KEYS.forEach(k => store[k] = []);
+let meta = { lastPull: null };
+let history = [];
+
+function readJSON(file, fallback) {
+  try { return JSON.parse(fs.readFileSync(path.join(DATA_DIR, file), "utf8")); }
+  catch (e) { return fallback; }
+}
+function writeJSON(file, data) {
+  try { fs.writeFileSync(path.join(DATA_DIR, file), JSON.stringify(data)); }
+  catch (e) { console.error("write fail", file, e.message); }
+}
+function loadStore() {
+  DATASET_KEYS.forEach(k => store[k] = readJSON(k + ".json", []));
+  meta = readJSON("meta.json", { lastPull: null });
+  history = readJSON("history.json", []);
+}
+loadStore();
+
+// ---------- Windsor fetch (ฝั่ง server ใช้ key จาก env) ----------
+function windsorKey() { return process.env.Windsor_key || process.env.WINDSOR_API_KEY || ""; }
+async function windsorFetch(connector, params) {
+  const url = `https://connectors.windsor.ai/${connector}?${params}&api_key=${encodeURIComponent(windsorKey())}`;
+  const r = await fetch(url);
+  const text = await r.text();
+  if (!r.ok) throw new Error(`Windsor HTTP ${r.status}: ${text.slice(0, 180)}`);
+  let j; try { j = JSON.parse(text); } catch (e) { throw new Error("Windsor: bad JSON"); }
+  return j.data || [];
+}
+
+// ---------- date helpers ----------
+function todayStr() { return new Date().toISOString().slice(0, 10); }
+function monthChunks(fromYear) {
+  const chunks = [];
+  const now = new Date();
+  const endY = now.getUTCFullYear(), endM = now.getUTCMonth();
+  const today = todayStr();
+  let y = fromYear, m = 0;
+  while (y < endY || (y === endY && m <= endM)) {
+    const mm = String(m + 1).padStart(2, "0");
+    const from = `${y}-${mm}-01`;
+    const lastDay = new Date(Date.UTC(y, m + 1, 0)).getUTCDate();
+    let to = `${y}-${mm}-${String(lastDay).padStart(2, "0")}`;
+    if (to > today) to = today;
+    chunks.push({ from, to });
+    m++; if (m > 11) { m = 0; y++; }
+  }
+  return chunks;
+}
+function presetRange(preset) {
+  const now = new Date();
+  const today = now.toISOString().slice(0, 10);
+  const back = n => { const x = new Date(now); x.setUTCDate(x.getUTCDate() - n); return x.toISOString().slice(0, 10); };
+  if (preset === "last_7d") return { from: back(7), to: back(1) };
+  if (preset === "last_14d") return { from: back(14), to: back(1) };
+  if (preset === "last_30d") return { from: back(30), to: back(1) };
+  if (preset === "this_month") {
+    const f = `${now.getUTCFullYear()}-${String(now.getUTCMonth() + 1).padStart(2, "0")}-01`;
+    return { from: f, to: today };
+  }
+  if (preset === "last_month") {
+    const y = now.getUTCFullYear(), m = now.getUTCMonth();
+    const pm = m === 0 ? 11 : m - 1, py = m === 0 ? y - 1 : y;
+    const mm = String(pm + 1).padStart(2, "0");
+    const ld = new Date(Date.UTC(py, pm + 1, 0)).getUTCDate();
+    return { from: `${py}-${mm}-01`, to: `${py}-${mm}-${String(ld).padStart(2, "0")}` };
+  }
+  return null;
+}
+
+// ---------- Pull job (singleton) ----------
+let job = { status: "idle", percent: 0, etaSec: null, done: 0, total: 0, currentLabel: "", startedAt: null, finishedAt: null, fromYear: null, error: null, rows: 0 };
+function jobPublic() {
+  return { status: job.status, percent: job.percent, etaSec: job.etaSec, done: job.done, total: job.total,
+    currentLabel: job.currentLabel, startedAt: job.startedAt, finishedAt: job.finishedAt, fromYear: job.fromYear, error: job.error, rows: job.rows };
+}
+async function runPull(fromYear) {
+  if (job.status === "running") return;
+  const months = monthChunks(fromYear);
+  job = { status: "running", percent: 0, etaSec: null, done: 0, total: PULL_SOURCES.length * months.length,
+    currentLabel: "เริ่มต้น…", startedAt: Date.now(), finishedAt: null, fromYear, error: null, rows: 0 };
+  let totalRows = 0;
+  try {
+    for (const src of PULL_SOURCES) {
+      const rows = [];
+      for (const ch of months) {
+        job.currentLabel = `${src.key} · ${ch.from.slice(0, 7)}`;
+        let got = null;
+        for (const fields of src.tiers) {
+          try { got = await windsorFetch(src.windsor, `date_from=${ch.from}&date_to=${ch.to}&fields=${fields}`); break; }
+          catch (e) { got = null; /* ลอง tier ถัดไป */ }
+        }
+        if (got && got.length) rows.push(...got);
+        job.done++;
+        const elapsed = (Date.now() - job.startedAt) / 1000;
+        job.percent = Math.round(job.done / job.total * 100);
+        job.etaSec = job.done > 0 ? Math.round(elapsed / job.done * (job.total - job.done)) : null;
+      }
+      store[src.key] = rows;
+      writeJSON(src.key + ".json", rows);
+      totalRows += rows.length;
+    }
+    job.status = "done"; job.finishedAt = Date.now(); job.percent = 100; job.etaSec = 0; job.rows = totalRows; job.currentLabel = "เสร็จสิ้น";
+    const durationSec = Math.round((job.finishedAt - job.startedAt) / 1000);
+    meta = { lastPull: { at: job.finishedAt, fromYear, rows: totalRows, durationSec } };
+    writeJSON("meta.json", meta);
+    history.unshift({ at: job.finishedAt, fromYear, rows: totalRows, durationSec, status: "done" });
+    history = history.slice(0, 50);
+    writeJSON("history.json", history);
+  } catch (e) {
+    job.status = "error"; job.error = String(e.message || e); job.finishedAt = Date.now();
+    history.unshift({ at: Date.now(), fromYear, rows: totalRows, durationSec: Math.round((Date.now() - job.startedAt) / 1000), status: "error", error: job.error });
+    history = history.slice(0, 50);
+    writeJSON("history.json", history);
+  }
+}
+
+// ---------- API: pull ----------
+app.post("/api/pull", (req, res) => {
+  if (!windsorKey()) return res.status(400).json({ error: "ไม่มี Windsor API key ฝั่ง server (env Windsor_key)" });
+  if (job.status === "running") return res.status(409).json({ error: "กำลังดึงข้อมูลอยู่แล้ว", status: jobPublic() });
+  const raw = req.query.fromYear || (req.body && req.body.fromYear) || "2025";
+  let fromYear = parseInt(raw, 10);
+  if (!fromYear || fromYear < 2015 || fromYear > new Date().getUTCFullYear()) fromYear = 2025;
+  runPull(fromYear); // fire-and-forget
+  res.json({ ok: true, status: jobPublic() });
+});
+app.get("/api/pull/status", (_req, res) => res.json(jobPublic()));
+app.get("/api/pull/history", (_req, res) => res.json({ history, lastPull: meta.lastPull }));
+
+// ---------- API: data (หน้าเว็บอ่านจากตรงนี้) ----------
+app.get("/api/data", (req, res) => {
+  const connector = ALLOWED_CONNECTORS.has(req.query.connector) ? req.query.connector : "all";
+  let rows = store[datasetForConnector(connector)] || [];
+  let from = req.query.date_from, to = req.query.date_to;
+  if (!from && req.query.date_preset) { const r = presetRange(req.query.date_preset); if (r) { from = r.from; to = r.to; } }
+  if (from) rows = rows.filter(r => !r.date || r.date >= from);
+  if (to) rows = rows.filter(r => !r.date || r.date <= to);
+  res.json({ data: rows, pulled: !!meta.lastPull, lastPull: meta.lastPull });
+});
+
+// ---------- API: windsor proxy (เก็บไว้เผื่อ debug) ----------
+app.get("/api/windsor", async (req, res) => {
+  const key = req.header("x-windsor-key") || windsorKey();
+  if (!key) return res.status(400).json({ error: "missing Windsor API key" });
   const params = new URLSearchParams(req.query);
   const connector = ALLOWED_CONNECTORS.has(params.get("connector")) ? params.get("connector") : "all";
-  params.delete("connector");            // ไม่ส่งต่อไป Windsor
+  params.delete("connector");
   params.set("api_key", key);
-
   try {
     const r = await fetch(`https://connectors.windsor.ai/${connector}?${params.toString()}`);
     const body = await r.text();
@@ -30,17 +211,14 @@ app.get("/api/windsor", async (req, res) => {
 });
 
 // Apify proxy — ดึง engagement ของโพสต์ (reactions/shares/comments) จาก post URL
-// key จาก env Apify_key ; actor + ชื่อ input field ตั้งค่าได้ผ่าน env (ค่าเริ่มต้น = scrapyspider/facebook-post-scraper)
 app.get("/api/apify", async (req, res) => {
   const key = process.env.Apify_key || process.env.APIFY_KEY || "";
   if (!key) return res.status(400).json({ error: "missing Apify key (env Apify_key)" });
   const url = req.query.url;
   if (!url) return res.status(400).json({ error: "missing post url" });
-
   const actor = (req.query.actor || process.env.Apify_actor || "scrapyspider/facebook-post-scraper").replace("/", "~");
   const urlField = process.env.Apify_url_field || "urls";
   const input = {}; input[urlField] = [url];
-
   try {
     const r = await fetch(`https://api.apify.com/v2/acts/${actor}/run-sync-get-dataset-items?token=${encodeURIComponent(key)}`, {
       method: "POST",
@@ -76,4 +254,4 @@ app.get("/api/img", async (req, res) => {
 app.use(express.static(__dirname));
 app.get("*", (_req, res) => res.sendFile(path.join(__dirname, "index.html")));
 
-app.listen(PORT, () => console.log("Windsor dashboard listening on :" + PORT));
+app.listen(PORT, () => console.log("Windsor dashboard listening on :" + PORT + " · DATA_DIR=" + DATA_DIR));

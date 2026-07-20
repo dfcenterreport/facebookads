@@ -202,6 +202,41 @@
   .setting-item:hover{background:var(--well)}
   .setting-sep{height:1px;background:var(--border);margin:5px 2px}
 
+  /* ===== Pull Data modal ===== */
+  .modal-overlay{display:none;position:fixed;inset:0;z-index:200;background:rgba(16,24,40,.45);align-items:flex-start;justify-content:center;padding:48px 16px;overflow:auto}
+  .modal-overlay.open{display:flex}
+  .modal{background:var(--surface);border-radius:12px;box-shadow:0 20px 60px rgba(16,24,40,.28);width:100%;max-width:560px;overflow:hidden}
+  .modal-head{display:flex;align-items:center;justify-content:space-between;padding:16px 20px;border-bottom:1px solid var(--border)}
+  .modal-head h3{font-size:16px;font-weight:700;color:var(--ink)}
+  .modal-x{border:none;background:transparent;font-size:16px;color:var(--muted);padding:4px 8px}
+  .modal-x:hover{background:var(--well);color:var(--ink)}
+  .modal-body{padding:18px 20px 22px}
+  .pull-desc{font-size:13px;color:var(--muted);line-height:1.6;margin-bottom:16px}
+  .pull-form{display:flex;align-items:flex-end;gap:12px;flex-wrap:wrap;margin-bottom:16px}
+  .pull-form label{display:flex;flex-direction:column;gap:6px;font-size:11px;font-weight:600;letter-spacing:.04em;text-transform:uppercase;color:var(--muted)}
+  .pull-form input{width:120px;font-family:'JetBrains Mono',monospace;font-size:14px}
+  .pull-progress{margin:6px 0 14px}
+  .pbar{height:12px;background:var(--well);border:1px solid var(--border);border-radius:999px;overflow:hidden}
+  .pbar-fill{height:100%;width:0;background:linear-gradient(90deg,var(--yellow),var(--yellow-dim));transition:width .4s ease}
+  .pull-status{display:flex;align-items:center;gap:10px;margin-top:8px;font-size:12px;flex-wrap:wrap}
+  .pull-status #pullPct{font-family:'JetBrains Mono',monospace;font-weight:700;color:var(--ink)}
+  .pull-label{color:var(--muted)}
+  .pull-eta{margin-left:auto;color:var(--muted);font-weight:500}
+  .pull-msg{font-size:13px;margin:6px 0;min-height:0}
+  .pull-msg.ok{color:var(--good)} .pull-msg.err{color:var(--bad)}
+  .pull-history{margin-top:18px;border-top:1px solid var(--border);padding-top:14px}
+  .pull-history h4{font-size:12px;font-weight:700;letter-spacing:.04em;text-transform:uppercase;color:var(--muted);margin-bottom:10px}
+  .pull-hrow{display:flex;align-items:center;gap:10px;font-size:12.5px;padding:7px 0;border-bottom:1px solid var(--border)}
+  .pull-hrow:last-child{border-bottom:none}
+  .pull-hstatus{width:8px;height:8px;border-radius:50%;flex:0 0 auto}
+  .pull-hstatus.done{background:var(--good)} .pull-hstatus.err{background:var(--bad)}
+  .pull-htime{font-weight:600;color:var(--ink)}
+  .pull-hmeta{color:var(--muted);margin-left:auto;font-family:'JetBrains Mono',monospace;font-size:11.5px;text-align:right}
+  .pull-hempty{font-size:12.5px;color:var(--muted)}
+  /* แถบเตือนตอนยังไม่มีข้อมูลใน DB */
+  .nodata-banner{display:flex;align-items:center;gap:12px;background:var(--yellow-tint);border:1px solid var(--yellow);border-radius:10px;padding:14px 16px;margin-bottom:16px;font-size:13.5px;color:var(--ink)}
+  .nodata-banner button{margin-left:auto}
+
   /* ===== Biddable ===== */
   .bid-head{display:flex;justify-content:space-between;align-items:flex-start;flex-wrap:wrap;gap:16px;margin-bottom:18px}
   .bid-grid{display:grid;grid-template-columns:repeat(auto-fit,minmax(340px,1fr));gap:16px}
@@ -314,14 +349,47 @@
     <div class="setting-menu" id="settingMenu">
       <div class="setting-btn" id="settingBtn">⚙️ Setting <span class="setting-caret">▾</span></div>
       <div class="setting-panel">
+        <div class="setting-item" data-act="pull">⤓ Pull Data</div>
+        <div class="setting-sep"></div>
         <div class="setting-item" data-act="key">🔑 API Key</div>
         <div class="setting-item" data-act="refresh">↻ รีเฟรชข้อมูล</div>
-        <div class="setting-sep"></div>
         <div class="setting-item" data-act="clearcache">🗑️ ล้าง Cache</div>
       </div>
     </div>
   </div>
 </nav>
+
+<!-- ===================== PULL DATA MODAL ===================== -->
+<div class="modal-overlay" id="pullOverlay">
+  <div class="modal" id="pullModal">
+    <div class="modal-head">
+      <h3>⤓ Pull Data — ดึงข้อมูลจาก Windsor</h3>
+      <button class="modal-x" id="pullClose">✕</button>
+    </div>
+    <div class="modal-body">
+      <p class="pull-desc">ดึงข้อมูลล่าสุดจาก Windsor มาเก็บไว้ในฐานข้อมูล เพื่อให้เปิดเว็บแล้วโหลดเร็วขึ้น (หน้าเว็บจะอ่านจากฐานข้อมูลนี้ ไม่ยิง Windsor ตอนเปิด)</p>
+      <div class="pull-form">
+        <label>ดึงข้อมูลตั้งแต่ปี (ค.ศ.)
+          <input type="number" id="pullYear" value="2025" min="2015" max="2026" step="1">
+        </label>
+        <button class="btn-primary" id="pullStart">▶ เริ่มดึงข้อมูล</button>
+      </div>
+      <div class="pull-progress" id="pullProgress" style="display:none">
+        <div class="pbar"><div class="pbar-fill" id="pbarFill"></div></div>
+        <div class="pull-status">
+          <span id="pullPct">0%</span>
+          <span id="pullLabel" class="pull-label">—</span>
+          <span id="pullEta" class="pull-eta"></span>
+        </div>
+      </div>
+      <div class="pull-msg" id="pullMsg"></div>
+      <div class="pull-history">
+        <h4>ประวัติการดึงข้อมูล</h4>
+        <div id="pullHistory"><div class="pull-hempty">— ยังไม่มีประวัติ —</div></div>
+      </div>
+    </div>
+  </div>
+</div>
 
 <!-- ===================== LANDING ===================== -->
 <section id="landingView">
@@ -371,7 +439,7 @@
   </header>
 
   <div class="chips" id="srcChips"></div>
-  <div id="content"><div class="loading">กำลังดึงข้อมูลจาก Windsor…</div></div>
+  <div id="content"><div class="loading">กำลังโหลดข้อมูลจากฐานข้อมูล…</div></div>
 </section>
 
 <!-- ===================== BIDDABLE ===================== -->
@@ -403,7 +471,7 @@
       <button id="bidApifyDebug" title="ทดสอบ Apify (reactions/share/comment)">🧪</button>
     </div>
   </div>
-  <div id="bidContent"><div class="loading">กำลังดึงข้อมูลจาก Windsor…</div></div>
+  <div id="bidContent"><div class="loading">กำลังโหลดข้อมูลจากฐานข้อมูล…</div></div>
 </section>
 
 <!-- ===================== AD BENCHMARK ===================== -->
@@ -436,7 +504,7 @@
     <label>Brand name<div class="ms" id="msBrand"></div></label>
     <label>Material type<div class="ms" id="msMaterial"></div></label>
   </div>
-  <div id="benchmarkContent"><div class="loading">กำลังดึงข้อมูลจาก Windsor…</div></div>
+  <div id="benchmarkContent"><div class="loading">กำลังโหลดข้อมูลจากฐานข้อมูล…</div></div>
 </section>
 
 <!-- ===================== ACTIVE AD ACCOUNT ===================== -->
@@ -482,29 +550,28 @@
     <canvas id="acctQuarterTrend"></canvas>
     <div id="acctQuarterCards" class="kpis" style="margin-top:16px"></div>
   </div>
-  <div id="activeAcctContent"><div class="loading">กำลังดึงข้อมูลจาก Windsor…</div></div>
+  <div id="activeAcctContent"><div class="loading">กำลังโหลดข้อมูลจากฐานข้อมูล…</div></div>
 </section>
 
 <script>
 /* ============================================================
    CONFIG — API key เก็บใน localStorage (ไม่ฝังในไฟล์)
    ============================================================ */
-// เปิดผ่านเซิร์ฟเวอร์ (Railway) → ใช้ proxy /api/windsor (same-origin ไม่ติด CORS)
-// เปิดไฟล์ตรงๆ (file://) → ดึง Windsor ตรง ใช้ key จาก localStorage
+// เปิดผ่านเซิร์ฟเวอร์ (Railway) → อ่านข้อมูลจาก DB ที่ /api/data (ดึงมาเก็บไว้ด้วยปุ่ม Pull Data)
+//   ไม่ยิง Windsor ตอนเปิดเว็บอีกต่อไป — เร็วขึ้น
+// เปิดไฟล์ตรงๆ (file://) → ไม่มี server/DB → ดึง Windsor ตรง ใช้ key จาก localStorage (โหมด fallback)
 const USE_PROXY = location.protocol === "http:" || location.protocol === "https:";
-const ENDPOINT = USE_PROXY ? "/api/windsor" : "https://connectors.windsor.ai/all";
 function wfetch(params, connector, timeoutMs){
-  // timeout กันค้าง: default 45 วิ (benchmark ช่วงยาวส่ง timeoutMs มากกว่านี้ได้)
+  // timeout กันค้าง: default 45 วิ
   const ctrl = new AbortController();
   const t = setTimeout(()=>ctrl.abort(), timeoutMs||45000);
   let p;
   if(USE_PROXY){
-    // รันผ่าน server (Railway): ใช้ key จาก env `Windsor_key` ฝั่ง server เท่านั้น
-    // ไม่ส่ง key จาก browser เพื่อไม่ให้ key เก่า/ผิดใน localStorage ไปทับ
+    // อ่านจาก DB (same-origin) — server กรองตามช่วงวันที่ให้ แล้วคืน {data:[...]} รูปแบบเดียวกับ Windsor
     const q = connector ? `connector=${connector}&${params}` : params;
-    p = fetch(`${ENDPOINT}?${q}`, {signal: ctrl.signal});
+    p = fetch(`/api/data?${q}`, {signal: ctrl.signal});
   }else{
-    const base = connector ? `https://connectors.windsor.ai/${connector}` : ENDPOINT;
+    const base = connector ? `https://connectors.windsor.ai/${connector}` : "https://connectors.windsor.ai/all";
     p = fetch(`${base}?api_key=${API_KEY}&${params}`, {signal: ctrl.signal});
   }
   return p.finally(()=>clearTimeout(t));
@@ -538,6 +605,7 @@ function ensureKey(force){
 }
 
 const SRC_COLORS = {facebook:"#4267B2", tiktok:"#0ea5b5", twitter:"#1DA1F2", other:"#969A9E"};
+let dbHasData = true;   // อ่านจาก /api/data (pulled flag) — false = DB ว่าง ให้ผู้ใช้กด Pull Data ก่อน
 let rawData = [], prevRaw = [], landingAccts = [];
 let activeSources = new Set();
 let activeAccount = "__all__";
@@ -569,7 +637,17 @@ async function loadAccounts(){
   try{
     const res = await wfetch(`date_preset=last_7d&fields=account_name,account_id,source,spend`);
     if(!res.ok) throw new Error("HTTP "+res.status);
-    const rows=(await res.json()).data||[];
+    const j = await res.json();
+    dbHasData = (j.pulled!==false);
+    if(USE_PROXY && j.pulled===false){
+      document.getElementById("landingContent").innerHTML=`
+        <div class="nodata-banner">
+          <span>📭 ยังไม่มีข้อมูลในฐานข้อมูล — กด <b>Pull Data</b> เพื่อดึงข้อมูลล่าสุดจาก Windsor มาเก็บไว้ก่อน (ทำครั้งเดียว โหลดครั้งต่อไปจะเร็ว)</span>
+          <button class="btn-primary" onclick="openPullModal()">⤓ Pull Data</button>
+        </div>`;
+      return;
+    }
+    const rows=j.data||[];
     const map={}; let grand=0;
     rows.forEach(r=>{
       const a=acctOf(r);
@@ -627,7 +705,7 @@ async function load(){
   if(!ensureKey(false)){
     document.getElementById("content").innerHTML='<div class="error">ยังไม่มี API key — กดปุ่ม “🔑 Key”</div>'; return;
   }
-  document.getElementById("content").innerHTML='<div class="loading">กำลังดึงข้อมูลจาก Windsor…</div>';
+  document.getElementById("content").innerHTML='<div class="loading">กำลังโหลดข้อมูลจากฐานข้อมูล…</div>';
   const range = preset==="custom" ? `date_from=${customFrom}&date_to=${customTo}` : `date_preset=${preset}`;
   try{
     const res=await wfetch(`${range}&fields=${FIELDS}`);
@@ -693,7 +771,7 @@ function render(){
   const prev=prevRaw.filter(matchFilters);
   const dates=[...new Set(rawData.map(r=>r.date))].sort();
   document.getElementById("rangeLabel").textContent=
-    dates.length?`${dates[0]} → ${dates[dates.length-1]} · ${data.length} แถว · ข้อมูลจาก Windsor`:"ไม่มีข้อมูล";
+    dates.length?`${dates[0]} → ${dates[dates.length-1]} · ${data.length} แถว · จากฐานข้อมูล`:"ไม่มีข้อมูล";
 
   const c=deriv(sumOf(data)), p=deriv(sumOf(prev));
 
@@ -749,7 +827,7 @@ async function loadActiveAccounts(){
   if(!ensureKey(false)){
     document.getElementById("activeAcctContent").innerHTML='<div class="error">ยังไม่มี API key — กดปุ่ม “🔑 Key”</div>'; return;
   }
-  document.getElementById("activeAcctContent").innerHTML='<div class="loading">กำลังดึงข้อมูลจาก Windsor…</div>';
+  document.getElementById("activeAcctContent").innerHTML='<div class="loading">กำลังโหลดข้อมูลจากฐานข้อมูล…</div>';
   const range = acctPreset==="custom" ? `date_from=${acctCustomFrom}&date_to=${acctCustomTo}` : `date_preset=${acctPreset}`;
   try{
     const res = await wfetch(`${range}&fields=account_name,campaign,campaign_status,spend`);
@@ -1063,7 +1141,7 @@ async function loadBiddable(){
   if(!ensureKey(false)){
     document.getElementById("bidContent").innerHTML='<div class="error">ยังไม่มี API key — กดปุ่ม “🔑 Key”</div>'; return;
   }
-  document.getElementById("bidContent").innerHTML='<div class="loading">กำลังดึงข้อมูลจาก Windsor…</div>';
+  document.getElementById("bidContent").innerHTML='<div class="loading">กำลังโหลดข้อมูลจากฐานข้อมูล…</div>';
   try{
     let data=null, opt="", lastStatus=0, lastBody="";
     for(const o of BID_OPT_TIERS){
@@ -1802,7 +1880,7 @@ async function loadBenchmark(force){
   const from=benchFrom, to=benchTo||new Date().toISOString().slice(0,10);
   const ck=`benchcache_fb_${from}_${to}`;
   if(!force){ const c=benchCacheGet(ck); if(c){ benchRaw=c; benchLoaded=true; document.getElementById("benchRangeLabel").textContent=`Cost per Result แยกตามแบรนด์ · ${from} → ${to} · ${benchRaw.length} แถว · (จาก cache)`; populateBenchFilters(); renderBenchmark(); return; } }
-  document.getElementById("benchmarkContent").innerHTML=`<div class="loading">กำลังดึงข้อมูลจาก Windsor… (${from} → ${to}) · ช่วงยาวอาจใช้เวลาสักครู่</div>`;
+  document.getElementById("benchmarkContent").innerHTML=`<div class="loading">กำลังโหลดข้อมูลจากฐานข้อมูล… (${from} → ${to}) · ช่วงยาวอาจใช้เวลาสักครู่</div>`;
   try{
     let data=null,lastStatus=0,lastBody="";
     for(const o of BENCH_OPT_TIERS){
@@ -1901,7 +1979,7 @@ async function loadBenchmarkTT(force){
   const from=benchFrom, to=benchTo||new Date().toISOString().slice(0,10);
   const ck=`benchcache_tt_${from}_${to}`;
   if(!force){ const c=benchCacheGet(ck); if(c){ benchRawTT=c; benchTTLoaded=true; document.getElementById("benchRangeLabel").textContent=`TikTok Cost per Result · ${from} → ${to} · ${benchRawTT.length} แถว · (จาก cache)`; populateBenchFilters(); renderBenchmark(); return; } }
-  document.getElementById("benchmarkContent").innerHTML=`<div class="loading">กำลังดึงข้อมูล TikTok จาก Windsor… (${from} → ${to}) · ช่วงยาวอาจใช้เวลาสักครู่</div>`;
+  document.getElementById("benchmarkContent").innerHTML=`<div class="loading">กำลังโหลดข้อมูล TikTok จากฐานข้อมูล… (${from} → ${to})</div>`;
   try{
     let data=null,lastStatus=0,lastBody="";
     for(const f of TT_TIERS){
@@ -2185,7 +2263,8 @@ document.getElementById("topNav").onclick=e=>{
     const item=e.target.closest(".setting-item"); if(!item) return;
     menu.classList.remove("open");
     const act=item.dataset.act;
-    if(act==="key"){ if(ensureKey(true)) refreshCurrentView(); }
+    if(act==="pull"){ openPullModal(); }
+    else if(act==="key"){ if(ensureKey(true)) refreshCurrentView(); }
     else if(act==="refresh"){ refreshCurrentView(); }
     else if(act==="clearcache"){
       let n=0;
@@ -2194,6 +2273,87 @@ document.getElementById("topNav").onclick=e=>{
     }
   };
 })();
+
+/* ---- Pull Data modal (ดึงข้อมูลจาก Windsor → เก็บใน DB + progress/ETA + history) ---- */
+let pullPoll=null;
+function fmtEta(sec){
+  if(sec==null) return "";
+  if(sec<=0) return "";
+  const m=Math.floor(sec/60), s=sec%60;
+  return m>0 ? `เหลืออีก ~${m} นาที${s?` ${s} วิ`:""}` : `เหลืออีก ~${s} วินาที`;
+}
+function fmtWhen(ts){
+  const d=new Date(ts);
+  const p=n=>String(n).padStart(2,"0");
+  return `${d.getFullYear()}-${p(d.getMonth()+1)}-${p(d.getDate())} ${p(d.getHours())}:${p(d.getMinutes())}`;
+}
+async function loadPullHistory(){
+  const box=document.getElementById("pullHistory");
+  try{
+    const r=await fetch("/api/pull/history"); const j=await r.json();
+    const h=j.history||[];
+    if(!h.length){ box.innerHTML='<div class="pull-hempty">— ยังไม่มีประวัติ —</div>'; return; }
+    box.innerHTML=h.map(x=>`
+      <div class="pull-hrow">
+        <span class="pull-hstatus ${x.status==="done"?"done":"err"}"></span>
+        <span class="pull-htime">${fmtWhen(x.at)}</span>
+        <span class="pull-hmeta">${x.status==="done"
+          ? `ปี ${x.fromYear} · ${(x.rows||0).toLocaleString("en-US")} แถว · ${x.durationSec}s`
+          : `ปี ${x.fromYear} · ❌ ${(x.error||"error").slice(0,40)}`}</span>
+      </div>`).join("");
+  }catch(e){ box.innerHTML='<div class="pull-hempty">โหลดประวัติไม่สำเร็จ</div>'; }
+}
+function renderPullStatus(s){
+  const prog=document.getElementById("pullProgress");
+  const running=s.status==="running";
+  prog.style.display = (running||s.status==="done"||s.status==="error") ? "block" : "none";
+  document.getElementById("pbarFill").style.width=(s.percent||0)+"%";
+  document.getElementById("pullPct").textContent=(s.percent||0)+"%";
+  document.getElementById("pullLabel").textContent = running ? `กำลังดึง: ${s.currentLabel||"…"} (${s.done}/${s.total})` : (s.currentLabel||"");
+  document.getElementById("pullEta").textContent = running ? fmtEta(s.etaSec) : "";
+  document.getElementById("pullStart").disabled = running;
+  document.getElementById("pullYear").disabled = running;
+  const msg=document.getElementById("pullMsg");
+  if(s.status==="done"){ msg.className="pull-msg ok"; msg.textContent=`✅ ดึงข้อมูลเสร็จ · ${(s.rows||0).toLocaleString("en-US")} แถว`; }
+  else if(s.status==="error"){ msg.className="pull-msg err"; msg.textContent=`❌ ${s.error||"ดึงข้อมูลไม่สำเร็จ"}`; }
+  else if(running){ msg.className="pull-msg"; msg.textContent=""; }
+}
+async function pollPullStatus(){
+  try{
+    const r=await fetch("/api/pull/status"); const s=await r.json();
+    renderPullStatus(s);
+    if(s.status!=="running"){
+      clearInterval(pullPoll); pullPoll=null;
+      loadPullHistory();
+      dbHasData=true;   // เพิ่งดึงเสร็จ → มีข้อมูลแล้ว
+    }
+  }catch(e){}
+}
+function openPullModal(){
+  document.getElementById("pullOverlay").classList.add("open");
+  document.getElementById("pullMsg").textContent="";
+  loadPullHistory();
+  // เผื่อมี job ค้างอยู่ (เปิด modal ระหว่างดึง)
+  fetch("/api/pull/status").then(r=>r.json()).then(s=>{
+    renderPullStatus(s);
+    if(s.status==="running" && !pullPoll) pullPoll=setInterval(pollPullStatus,1500);
+  }).catch(()=>{});
+}
+function closePullModal(){ document.getElementById("pullOverlay").classList.remove("open"); }
+document.getElementById("pullClose").onclick=closePullModal;
+document.getElementById("pullOverlay").onclick=e=>{ if(e.target.id==="pullOverlay") closePullModal(); };
+document.getElementById("pullStart").onclick=async()=>{
+  const year=parseInt(document.getElementById("pullYear").value,10)||2025;
+  const msg=document.getElementById("pullMsg");
+  msg.className="pull-msg"; msg.textContent="";
+  try{
+    const r=await fetch(`/api/pull?fromYear=${year}`,{method:"POST"});
+    const j=await r.json();
+    if(!r.ok){ msg.className="pull-msg err"; msg.textContent=`❌ ${j.error||"เริ่มดึงข้อมูลไม่สำเร็จ"}`; if(j.status) renderPullStatus(j.status); return; }
+    renderPullStatus(j.status||{status:"running",percent:0,done:0,total:0});
+    if(!pullPoll) pullPoll=setInterval(pollPullStatus,1500);
+  }catch(e){ msg.className="pull-msg err"; msg.textContent="❌ เชื่อมต่อ server ไม่ได้"; }
+};
 
 /* ---- Ad Benchmark: filters, date range, refresh ---- */
 (function(){

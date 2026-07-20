@@ -4,3 +4,6 @@ _stitch_fb/
 .claude/
 *.zip
 node_modules/
+
+# runtime data store (Pull Data → เก็บบน volume ฝั่ง production)
+data/
