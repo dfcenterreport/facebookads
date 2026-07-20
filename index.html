@@ -237,6 +237,36 @@
   .nodata-banner{display:flex;align-items:center;gap:12px;background:var(--yellow-tint);border:1px solid var(--yellow);border-radius:10px;padding:14px 16px;margin-bottom:16px;font-size:13.5px;color:var(--ink)}
   .nodata-banner button{margin-left:auto}
 
+  /* ===== ตั้งเวลาดึงอัตโนมัติ ===== */
+  .pull-sched{margin-top:18px;border-top:1px solid var(--border);padding-top:14px}
+  .sched-head{display:flex;align-items:center;justify-content:space-between;margin-bottom:6px}
+  .sched-head h4{font-size:12px;font-weight:700;letter-spacing:.04em;text-transform:uppercase;color:var(--muted)}
+  .sched-tz{font-weight:500;text-transform:none;letter-spacing:normal;font-size:11px;color:var(--muted)}
+  .sched-add{font-size:12px;font-weight:600;padding:5px 10px}
+  .sched-empty{font-size:12.5px;color:var(--muted);padding:6px 0}
+  .sched-row{display:flex;align-items:center;gap:12px;padding:10px 0;border-bottom:1px solid var(--border)}
+  .sched-row:last-child{border-bottom:none}
+  .sched-row.off{opacity:.5}
+  .sched-main{flex:1;min-width:0}
+  .sched-time{font-family:'JetBrains Mono',monospace;font-size:22px;font-weight:700;border:1px solid transparent;padding:0;background:transparent;color:var(--ink)}
+  .sched-time:focus{outline:none;border-bottom:2px solid var(--yellow)}
+  .sched-sub{display:flex;align-items:center;gap:12px;flex-wrap:wrap;margin-top:5px}
+  .sched-days{display:flex;gap:3px}
+  .dchip{font-size:10.5px;font-weight:600;color:var(--muted);background:var(--well);border:1px solid var(--border);border-radius:999px;min-width:24px;height:22px;padding:0 4px;display:flex;align-items:center;justify-content:center;cursor:pointer;user-select:none}
+  .dchip.on{background:var(--yellow);color:var(--ink);border-color:var(--yellow)}
+  .sched-year{font-size:11px;color:var(--muted);display:flex;align-items:center;gap:5px}
+  .sched-year input{width:66px;font-size:12px;padding:3px 6px;font-family:'JetBrains Mono',monospace}
+  .sched-last{font-size:10.5px;color:var(--muted);margin-top:4px}
+  .sched-del{border:none;background:transparent;color:var(--muted);padding:4px 7px;font-size:14px;border-radius:6px}
+  .sched-del:hover{color:var(--bad);background:var(--well)}
+  /* iOS-style toggle */
+  .switch{position:relative;display:inline-block;width:46px;height:26px;flex:0 0 auto}
+  .switch input{opacity:0;width:0;height:0;position:absolute}
+  .slider{position:absolute;inset:0;background:var(--gray);border-radius:999px;transition:.2s;cursor:pointer}
+  .slider:before{content:"";position:absolute;width:20px;height:20px;left:3px;top:3px;background:#fff;border-radius:50%;transition:.2s;box-shadow:0 1px 2px rgba(0,0,0,.25)}
+  .switch input:checked + .slider{background:var(--good)}
+  .switch input:checked + .slider:before{transform:translateX(20px)}
+
   /* ===== Biddable ===== */
   .bid-head{display:flex;justify-content:space-between;align-items:flex-start;flex-wrap:wrap;gap:16px;margin-bottom:18px}
   .bid-grid{display:grid;grid-template-columns:repeat(auto-fit,minmax(340px,1fr));gap:16px}
@@ -383,6 +413,13 @@
         </div>
       </div>
       <div class="pull-msg" id="pullMsg"></div>
+      <div class="pull-sched">
+        <div class="sched-head">
+          <h4>⏰ ตั้งเวลาดึงอัตโนมัติ <span class="sched-tz">(เวลาไทย)</span></h4>
+          <button class="sched-add" id="schedAdd">+ เพิ่มเวลา</button>
+        </div>
+        <div id="schedList"><div class="sched-empty">— ยังไม่มีเวลาที่ตั้งไว้ —</div></div>
+      </div>
       <div class="pull-history">
         <h4>ประวัติการดึงข้อมูล</h4>
         <div id="pullHistory"><div class="pull-hempty">— ยังไม่มีประวัติ —</div></div>
@@ -2333,6 +2370,7 @@ function openPullModal(){
   document.getElementById("pullOverlay").classList.add("open");
   document.getElementById("pullMsg").textContent="";
   loadPullHistory();
+  loadSchedules();
   // เผื่อมี job ค้างอยู่ (เปิด modal ระหว่างดึง)
   fetch("/api/pull/status").then(r=>r.json()).then(s=>{
     renderPullStatus(s);
@@ -2345,6 +2383,8 @@ document.getElementById("pullOverlay").onclick=e=>{ if(e.target.id==="pullOverla
 document.getElementById("pullStart").onclick=async()=>{
   const year=parseInt(document.getElementById("pullYear").value,10)||2025;
   const msg=document.getElementById("pullMsg");
+  // ยืนยันก่อนเริ่ม — การดึงตั้งแต่ต้นปีใช้เวลานาน (อาจหลายสิบนาที–ชั่วโมง) และจะเขียนทับข้อมูลเดิมใน DB
+  if(!confirm(`แน่ใจหรือไม่ว่าจะเริ่มดึงข้อมูลจาก Windsor ตั้งแต่ปี ${year} ?\n\n• ใช้เวลานาน (อาจหลายสิบนาทีถึงหลายชั่วโมง ขึ้นกับปริมาณข้อมูล)\n• ข้อมูลเดิมในฐานข้อมูลจะถูกเขียนทับด้วยชุดใหม่\n\nกด OK เพื่อเริ่มดึง`)) return;
   msg.className="pull-msg"; msg.textContent="";
   try{
     const r=await fetch(`/api/pull?fromYear=${year}`,{method:"POST"});
@@ -2354,6 +2394,63 @@ document.getElementById("pullStart").onclick=async()=>{
     if(!pullPoll) pullPoll=setInterval(pollPullStatus,1500);
   }catch(e){ msg.className="pull-msg err"; msg.textContent="❌ เชื่อมต่อ server ไม่ได้"; }
 };
+
+/* ---- ตั้งเวลาดึงอัตโนมัติ (server-side scheduler) ---- */
+let schedules=[];
+const DOW=["อา","จ","อ","พ","พฤ","ศ","ส"];
+async function loadSchedules(){
+  try{ const r=await fetch("/api/schedules"); schedules=(await r.json()).schedules||[]; }catch(e){ schedules=[]; }
+  renderSchedules();
+}
+async function saveSchedules(){
+  try{ const r=await fetch("/api/schedules",{method:"POST",headers:{"content-type":"application/json"},body:JSON.stringify({schedules})});
+    const j=await r.json(); if(j.schedules){ schedules=j.schedules; } }catch(e){}
+  renderSchedules();
+}
+function isDayOn(s,di){ return !s.days||!s.days.length||s.days.includes(di); }
+function fmtLastRun(ts){ if(!ts) return ""; return `ดึงล่าสุด: ${ts}`; }
+function renderSchedules(){
+  const box=document.getElementById("schedList");
+  if(!schedules.length){ box.innerHTML='<div class="sched-empty">— ยังไม่มีเวลาที่ตั้งไว้ —</div>'; return; }
+  box.innerHTML=schedules.map((s,i)=>`
+    <div class="sched-row ${s.enabled?"":"off"}">
+      <div class="sched-main">
+        <input type="time" class="sched-time" value="${s.time}" data-i="${i}" data-k="time">
+        <div class="sched-sub">
+          <div class="sched-days">${DOW.map((d,di)=>`<span class="dchip ${isDayOn(s,di)?"on":""}" data-i="${i}" data-d="${di}">${d}</span>`).join("")}</div>
+          <span class="sched-year">ปี <input type="number" min="2015" max="2026" value="${s.fromYear}" data-i="${i}" data-k="fromYear"></span>
+        </div>
+        ${s.lastRun?`<div class="sched-last">${fmtLastRun(s.lastRun)}</div>`:""}
+      </div>
+      <label class="switch"><input type="checkbox" ${s.enabled?"checked":""} data-i="${i}" data-k="enabled"><span class="slider"></span></label>
+      <button class="sched-del" data-i="${i}" title="ลบ">🗑</button>
+    </div>`).join("");
+}
+document.getElementById("schedAdd").onclick=()=>{
+  const y=parseInt(document.getElementById("pullYear").value,10)||2025;
+  schedules.push({time:"08:00",days:[],fromYear:y,enabled:true,lastRun:null});
+  saveSchedules();
+};
+document.getElementById("schedList").addEventListener("click",e=>{
+  const del=e.target.closest(".sched-del");
+  if(del){ schedules.splice(+del.dataset.i,1); saveSchedules(); return; }
+  const chip=e.target.closest(".dchip");
+  if(chip){
+    const i=+chip.dataset.i, d=+chip.dataset.d, s=schedules[i];
+    let days=(s.days&&s.days.length)?s.days.slice():[0,1,2,3,4,5,6];
+    days = days.includes(d) ? days.filter(x=>x!==d) : days.concat(d);
+    s.days = days.length>=7 ? [] : days;   // ครบ/ว่าง = ทุกวัน
+    saveSchedules();
+  }
+});
+document.getElementById("schedList").addEventListener("change",e=>{
+  const el=e.target, i=+el.dataset.i, k=el.dataset.k;
+  if(i==null||!k||!schedules[i]) return;
+  if(k==="enabled") schedules[i].enabled=el.checked;
+  else if(k==="fromYear") schedules[i].fromYear=parseInt(el.value,10)||2025;
+  else if(k==="time") schedules[i].time=el.value;
+  saveSchedules();
+});
 
 /* ---- Ad Benchmark: filters, date range, refresh ---- */
 (function(){

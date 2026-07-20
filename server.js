@@ -182,6 +182,57 @@ app.post("/api/pull", (req, res) => {
 app.get("/api/pull/status", (_req, res) => res.json(jobPublic()));
 app.get("/api/pull/history", (_req, res) => res.json({ history, lastPull: meta.lastPull }));
 
+// ---------- ตั้งเวลาดึงอัตโนมัติ (scheduler ฝั่ง server → รันแม้ไม่เปิดเว็บ) ----------
+// schedule: { id, time:"HH:MM", days:[0..6] (ว่าง=ทุกวัน, 0=อาทิตย์), fromYear, enabled, lastRun }
+let schedules = readJSON("schedules.json", []);
+function saveSchedules() { writeJSON("schedules.json", schedules); }
+function normalizeSchedule(s) {
+  const days = Array.isArray(s.days) ? [...new Set(s.days.map(Number).filter(d => d >= 0 && d <= 6))] : [];
+  return {
+    id: s.id || ("s" + Math.random().toString(36).slice(2, 9)),
+    time: /^\d{2}:\d{2}$/.test(s.time) ? s.time : "08:00",
+    days: days.length === 7 ? [] : days,     // ครบ 7 วัน = ทุกวัน (เก็บเป็น [])
+    fromYear: parseInt(s.fromYear, 10) || 2025,
+    enabled: !!s.enabled,
+    lastRun: s.lastRun || null,
+  };
+}
+schedules = schedules.map(normalizeSchedule);
+
+app.get("/api/schedules", (_req, res) => res.json({ schedules }));
+app.post("/api/schedules", (req, res) => {
+  const list = (req.body && req.body.schedules);
+  if (!Array.isArray(list)) return res.status(400).json({ error: "schedules ต้องเป็น array" });
+  schedules = list.map(normalizeSchedule);
+  saveSchedules();
+  res.json({ ok: true, schedules });
+});
+
+// เวลาปัจจุบันโซนไทย (Asia/Bangkok)
+function bangkokParts() {
+  const fmt = new Intl.DateTimeFormat("en-GB", {
+    timeZone: "Asia/Bangkok", hour12: false,
+    year: "numeric", month: "2-digit", day: "2-digit", hour: "2-digit", minute: "2-digit", weekday: "short",
+  });
+  const p = {}; fmt.formatToParts(new Date()).forEach(x => p[x.type] = x.value);
+  const dowMap = { Sun: 0, Mon: 1, Tue: 2, Wed: 3, Thu: 4, Fri: 5, Sat: 6 };
+  return { date: `${p.year}-${p.month}-${p.day}`, hm: `${p.hour}:${p.minute}`, dow: dowMap[p.weekday] };
+}
+// เช็คทุก 30 วิ — ถ้าถึงเวลาที่ตั้งไว้ & เปิดอยู่ → รัน pull (ยิงครั้งเดียวต่อ 1 นาที)
+setInterval(() => {
+  const t = bangkokParts();
+  const stamp = `${t.date} ${t.hm}`;
+  for (const s of schedules) {
+    if (!s.enabled || s.time !== t.hm) continue;
+    if (s.days && s.days.length && !s.days.includes(t.dow)) continue;
+    if (s.lastRun === stamp) continue;          // ยิงไปแล้วในนาทีนี้
+    s.lastRun = stamp; saveSchedules();
+    if (job.status === "running") { console.log("[schedule] ข้าม (กำลังดึงอยู่)", s.time); continue; }
+    console.log("[schedule] เริ่มดึงอัตโนมัติ", s.time, "fromYear", s.fromYear);
+    runPull(s.fromYear);
+  }
+}, 30000);
+
 // ---------- API: data (หน้าเว็บอ่านจากตรงนี้) ----------
 app.get("/api/data", (req, res) => {
   const connector = ALLOWED_CONNECTORS.has(req.query.connector) ? req.query.connector : "all";
