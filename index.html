@@ -183,12 +183,24 @@
   .footnote{color:var(--muted);font-size:11px;margin-top:10px}
 
   /* ===== Top nav ===== */
-  .topnav{display:flex;align-items:center;justify-content:space-between;padding-bottom:14px;margin-bottom:22px;border-bottom:1px solid var(--border)}
+  .topnav{display:flex;align-items:center;justify-content:space-between;flex-wrap:wrap;gap:10px;padding-bottom:14px;margin-bottom:22px;border-bottom:1px solid var(--border)}
   .topnav-brand{font-family:'Hanken Grotesk','Noto Sans Thai',sans-serif;font-weight:700;font-size:15px;color:var(--ink)}
+  .topnav-right{display:flex;align-items:center;flex-wrap:wrap;gap:14px}
   .topnav-tabs{display:flex;gap:4px}
   .topnav-tab{padding:8px 14px;font-size:13px;font-weight:600;color:var(--muted);cursor:pointer;border-radius:4px}
   .topnav-tab:hover{color:var(--text);background:var(--well)}
   .topnav-tab.active{background:var(--yellow);color:var(--ink)}
+  /* Setting menu (top-right) */
+  .setting-menu{position:relative}
+  .setting-btn{display:flex;align-items:center;gap:6px;padding:8px 14px;font-size:13px;font-weight:600;color:var(--muted);cursor:pointer;border-radius:4px;user-select:none}
+  .setting-btn:hover{color:var(--text);background:var(--well)}
+  .setting-menu.open .setting-btn{color:var(--ink);background:var(--well)}
+  .setting-caret{font-size:10px}
+  .setting-panel{display:none;position:absolute;z-index:60;top:calc(100% + 6px);right:0;min-width:200px;background:var(--surface);border:1px solid var(--border);border-radius:8px;box-shadow:0 8px 24px rgba(16,24,40,.14);padding:6px}
+  .setting-menu.open .setting-panel{display:block}
+  .setting-item{display:flex;align-items:center;gap:10px;padding:9px 11px;border-radius:6px;font-size:13px;font-weight:500;color:var(--text);cursor:pointer;white-space:nowrap}
+  .setting-item:hover{background:var(--well)}
+  .setting-sep{height:1px;background:var(--border);margin:5px 2px}
 
   /* ===== Biddable ===== */
   .bid-head{display:flex;justify-content:space-between;align-items:flex-start;flex-wrap:wrap;gap:16px;margin-bottom:18px}
@@ -292,11 +304,22 @@
 
 <nav class="topnav" id="topNav">
   <div class="topnav-brand">📊 Windsor Media</div>
-  <div class="topnav-tabs">
-    <div class="topnav-tab active" data-view="app">Dashboard</div>
-    <div class="topnav-tab" data-view="biddable">Creative Report</div>
-    <div class="topnav-tab" data-view="benchmark">Ad Benchmark</div>
-    <div class="topnav-tab" data-view="activeacct">Active Ad account</div>
+  <div class="topnav-right">
+    <div class="topnav-tabs">
+      <div class="topnav-tab active" data-view="app">Dashboard</div>
+      <div class="topnav-tab" data-view="biddable">Creative Report</div>
+      <div class="topnav-tab" data-view="benchmark">Ad Benchmark</div>
+      <div class="topnav-tab" data-view="activeacct">Active Ad account</div>
+    </div>
+    <div class="setting-menu" id="settingMenu">
+      <div class="setting-btn" id="settingBtn">⚙️ Setting <span class="setting-caret">▾</span></div>
+      <div class="setting-panel">
+        <div class="setting-item" data-act="key">🔑 API Key</div>
+        <div class="setting-item" data-act="refresh">↻ รีเฟรชข้อมูล</div>
+        <div class="setting-sep"></div>
+        <div class="setting-item" data-act="clearcache">🗑️ ล้าง Cache</div>
+      </div>
+    </div>
   </div>
 </nav>
 
@@ -2142,6 +2165,35 @@ document.getElementById("topNav").onclick=e=>{
     else showLanding();
   }
 };
+
+/* ---- Setting menu (top-right) ---- */
+(function(){
+  const menu=document.getElementById("settingMenu");
+  const btn=document.getElementById("settingBtn");
+  if(!menu||!btn) return;
+  btn.onclick=e=>{ e.stopPropagation(); menu.classList.toggle("open"); };
+  document.addEventListener("click", e=>{ if(!menu.contains(e.target)) menu.classList.remove("open"); });
+  // คลิกปุ่ม refresh ของ view ที่กำลังแสดงอยู่
+  function refreshCurrentView(){
+    const ids = ["refresh","bidRefresh","benchRefresh","refreshLanding"];
+    for(const id of ids){
+      const b=document.getElementById(id);
+      if(b && b.offsetParent!==null){ b.click(); return; }
+    }
+  }
+  menu.querySelector(".setting-panel").onclick=e=>{
+    const item=e.target.closest(".setting-item"); if(!item) return;
+    menu.classList.remove("open");
+    const act=item.dataset.act;
+    if(act==="key"){ if(ensureKey(true)) refreshCurrentView(); }
+    else if(act==="refresh"){ refreshCurrentView(); }
+    else if(act==="clearcache"){
+      let n=0;
+      Object.keys(localStorage).forEach(k=>{ if(k.startsWith("benchcache_")){ localStorage.removeItem(k); n++; } });
+      alert(n ? `ล้าง cache แล้ว ${n} รายการ` : "ไม่มี cache ให้ล้าง");
+    }
+  };
+})();
 
 /* ---- Ad Benchmark: filters, date range, refresh ---- */
 (function(){
