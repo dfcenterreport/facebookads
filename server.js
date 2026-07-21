@@ -29,7 +29,8 @@ const PULL_SOURCES = [
     "source,account_name,account_id,campaign,spend,impressions,reach,clicks,date",
   ]},
   { key: "facebook", windsor: "facebook", tiers: [
-    "source,account_name,account_id,campaign,adset_name,ad_name,spend,impressions,reach,clicks,date,thumbnail_url,object_story_id,effective_object_story_id,permalink_url",
+    // NB: permalink_url ไม่ valid สำหรับ facebook connector → ใช้ object_story_id แปลงเป็นลิงก์โพสต์แทน
+    "source,account_name,account_id,campaign,adset_name,ad_name,spend,impressions,reach,clicks,date,thumbnail_url,object_story_id,effective_object_story_id",
     "source,account_name,account_id,campaign,adset_name,ad_name,spend,impressions,reach,clicks,date,thumbnail_url",
     "source,account_name,account_id,campaign,adset_name,ad_name,spend,impressions,reach,clicks,date",
   ]},
@@ -79,6 +80,8 @@ async function windsorFetch(connector, params) {
   const text = await r.text();
   if (!r.ok) throw new Error(`Windsor HTTP ${r.status}: ${text.slice(0, 180)}`);
   let j; try { j = JSON.parse(text); } catch (e) { throw new Error("Windsor: bad JSON"); }
+  // Windsor คืน error เป็น HTTP 200 + {error:...} (เช่น field ไม่ valid) → ต้อง throw เพื่อให้ fallback ไป tier ถัดไป
+  if (j && j.error) throw new Error(`Windsor: ${String(j.error).slice(0, 180)}`);
   return j.data || [];
 }
 
@@ -159,9 +162,16 @@ async function runPull(fromYear, origin) {
         job.percent = Math.round(job.done / job.total * 100);
         job.etaSec = job.done > 0 ? Math.round(elapsed / job.done * (job.total - job.done)) : null;
       }
-      store[src.key] = rows;
-      writeJSON(src.key + ".json", rows);
-      totalRows += rows.length;
+      const prevCount = (store[src.key] || []).length;
+      if (rows.length === 0 && prevCount > 0) {
+        // ได้ 0 แถว แต่ของเดิมมีข้อมูล → น่าจะ error ชั่วคราว ไม่เขียนทับ (กันข้อมูลหายเหมือนเคส facebook)
+        console.log(`[pull] ${src.key}: ได้ 0 แถว (เดิมมี ${prevCount}) → คงข้อมูลเดิมไว้`);
+        totalRows += prevCount;
+      } else {
+        store[src.key] = rows;
+        writeJSON(src.key + ".json", rows);
+        totalRows += rows.length;
+      }
     }
     job.status = "done"; job.finishedAt = Date.now(); job.percent = 100; job.etaSec = 0; job.rows = totalRows; job.currentLabel = "เสร็จสิ้น";
     const durationSec = Math.round((job.finishedAt - job.startedAt) / 1000);
