@@ -29,8 +29,10 @@ const PULL_SOURCES = [
     "source,account_name,account_id,campaign,spend,impressions,reach,clicks,date",
   ]},
   { key: "facebook", windsor: "facebook", tiers: [
-    // ชุดใหญ่สุด: + metric สำหรับ Ad Benchmark (cost_per_*, actions_*, outbound) — ถ้า field ไม่ valid จะถอยไปชุดล่าง
-    "source,account_name,account_id,campaign,adset_name,ad_name,spend,impressions,reach,clicks,date,thumbnail_url,object_story_id,effective_object_story_id,cost_per_action_type_video_view,cost_per_thruplay_video_view,cost_per_action_type_page_engagement,outbound_clicks_outbound_click,actions_omni_add_to_cart,actions_omni_purchase,actions_omni_view_content,actions_onsite_conversion_messaging_conversation_started_7d",
+    // ชุดใหญ่สุด: base + story/thumbnail + metric (raw count) สำหรับ Ad Benchmark — ถ้า field ไม่ valid จะถอยไปชุดล่าง
+    "source,account_name,account_id,campaign,adset_name,ad_name,spend,impressions,reach,clicks,date,thumbnail_url,object_story_id,effective_object_story_id,video_views,video_thruplay_watched_actions,post_engagement,outbound_clicks,actions_omni_add_to_cart,actions_omni_purchase,actions_omni_view_content,actions_onsite_conversion_messaging_conversation_started_7d",
+    // metric ชุดปลอดภัย (video/engagement/outbound) — ถ้า actions_* พัง ยังได้ VR%/Thruplay/ER%/Outbound
+    "source,account_name,account_id,campaign,adset_name,ad_name,spend,impressions,reach,clicks,date,thumbnail_url,object_story_id,effective_object_story_id,video_views,video_thruplay_watched_actions,post_engagement,outbound_clicks",
     // NB: permalink_url ไม่ valid สำหรับ facebook connector → ใช้ object_story_id แปลงเป็นลิงก์โพสต์แทน
     "source,account_name,account_id,campaign,adset_name,ad_name,spend,impressions,reach,clicks,date,thumbnail_url,object_story_id,effective_object_story_id",
     "source,account_name,account_id,campaign,adset_name,ad_name,spend,impressions,reach,clicks,date,thumbnail_url",
@@ -327,6 +329,28 @@ app.get("/api/data", (req, res) => {
   if (from) rows = rows.filter(r => !r.date || r.date >= from);
   if (to) rows = rows.filter(r => !r.date || r.date <= to);
   res.json({ data: rows, pulled: !!meta.lastPull, lastPull: meta.lastPull });
+});
+
+// ---------- API: field test — ตรวจว่า field ไหน valid + มีค่าจริง (ช่วง 30 วันล่าสุด) ----------
+const FIELDTEST_DEFAULTS = {
+  facebook: ["video_views","video_view","video_thruplay_watched_actions","thruplays","post_engagement","page_engagement","outbound_clicks","outbound_clicks_outbound_click","inline_link_clicks","cost_per_action_type_video_view","cost_per_thruplay_video_view","cost_per_action_type_page_engagement","actions_omni_add_to_cart","actions_omni_purchase","actions_omni_view_content","actions_onsite_conversion_messaging_conversation_started_7d"],
+  tiktok: ["play_duration_2s","play_duration_6s","focused_view_15s","video_views","video_watched_2s","video_watched_6s","video_views_p25","video_views_p100"],
+};
+app.get("/api/fieldtest", async (req, res) => {
+  const connector = ALLOWED_CONNECTORS.has(req.query.connector) ? req.query.connector : "facebook";
+  const cands = (req.query.fields || "").split(",").map(s => s.trim()).filter(Boolean);
+  const list = cands.length ? cands : (FIELDTEST_DEFAULTS[connector] || FIELDTEST_DEFAULTS.facebook);
+  const to = todayStr();
+  const from = new Date(Date.now() - 30 * 864e5).toISOString().slice(0, 10);
+  const out = {};
+  for (const f of list) {
+    try {
+      const rows = await windsorFetch(connector, `date_from=${from}&date_to=${to}&fields=account_name,${f}`);
+      const has = rows.some(r => r[f] != null && r[f] !== "" && +r[f] > 0);
+      out[f] = rows.length ? (has ? "OK (มีค่า)" : "OK (ว่าง/0)") : "OK (0 rows)";
+    } catch (e) { out[f] = "ERROR: " + String(e.message).slice(0, 100); }
+  }
+  res.json({ connector, from, to, result: out });
 });
 
 // ---------- API: windsor proxy (เก็บไว้เผื่อ debug) ----------
