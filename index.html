@@ -1914,10 +1914,11 @@ function parseCampaignTT(name){
 }
 function bnum(r, keys){ for(const k of keys){ const v=r[k]; if(v!=null&&v!=="") return +v||0; } return 0; }
 
-// cache ใน localStorage (benchmark ข้อมูลย้อนหลัง ไม่ค่อยเปลี่ยน) — TTL 6 ชม.
+// เลิกใช้ localStorage cache แล้ว — ข้อมูลอ่านจาก DB (/api/data) ซึ่งเร็วอยู่แล้ว
+// การ cache ซ้ำใน browser ทำให้เห็นข้อมูลเก่าค้าง (เช่นตอน dataset เพิ่งถูกเติมจาก Pull)
 const BENCH_TTL=6*3600*1000;
-function benchCacheGet(k){ try{ const s=localStorage.getItem(k); if(!s) return null; const o=JSON.parse(s); if(Date.now()-o.ts>BENCH_TTL) return null; return o.data; }catch(e){ return null; } }
-function benchCacheSet(k,data){ try{ localStorage.setItem(k, JSON.stringify({ts:Date.now(),data})); }catch(e){} }
+function benchCacheGet(k){ return null; }        // อ่าน DB สดเสมอ
+function benchCacheSet(k,data){}                  // no-op
 
 async function loadBenchmark(force){
   if(!ensureKey(false)){ document.getElementById("benchmarkContent").innerHTML='<div class="error">ยังไม่มี API key — กดปุ่ม 🔑 Key</div>'; return; }
