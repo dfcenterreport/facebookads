@@ -29,12 +29,16 @@ const PULL_SOURCES = [
     "source,account_name,account_id,campaign,spend,impressions,reach,clicks,date",
   ]},
   { key: "facebook", windsor: "facebook", tiers: [
+    // ชุดใหญ่สุด: + metric สำหรับ Ad Benchmark (cost_per_*, actions_*, outbound) — ถ้า field ไม่ valid จะถอยไปชุดล่าง
+    "source,account_name,account_id,campaign,adset_name,ad_name,spend,impressions,reach,clicks,date,thumbnail_url,object_story_id,effective_object_story_id,cost_per_action_type_video_view,cost_per_thruplay_video_view,cost_per_action_type_page_engagement,outbound_clicks_outbound_click,actions_omni_add_to_cart,actions_omni_purchase,actions_omni_view_content,actions_onsite_conversion_messaging_conversation_started_7d",
     // NB: permalink_url ไม่ valid สำหรับ facebook connector → ใช้ object_story_id แปลงเป็นลิงก์โพสต์แทน
     "source,account_name,account_id,campaign,adset_name,ad_name,spend,impressions,reach,clicks,date,thumbnail_url,object_story_id,effective_object_story_id",
     "source,account_name,account_id,campaign,adset_name,ad_name,spend,impressions,reach,clicks,date,thumbnail_url",
     "source,account_name,account_id,campaign,adset_name,ad_name,spend,impressions,reach,clicks,date",
   ]},
   { key: "tiktok", windsor: "tiktok", tiers: [
+    // ชุดใหญ่สุด: + play_duration (CPV/VR%) สำหรับ TikTok benchmark
+    "source,account_name,account_id,campaign,adset_name,ad_name,spend,impressions,reach,clicks,date,play_duration_2s,play_duration_6s,focused_view_15s",
     "source,account_name,account_id,campaign,adset_name,ad_name,spend,impressions,reach,clicks,date",
   ]},
   { key: "facebook_organic", windsor: "facebook_organic", tiers: [
