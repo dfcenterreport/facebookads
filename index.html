@@ -257,6 +257,7 @@
   .sched-year{font-size:11px;color:var(--muted);display:flex;align-items:center;gap:5px}
   .sched-year input{width:66px;font-size:12px;padding:3px 6px;font-family:'JetBrains Mono',monospace}
   .sched-last{font-size:10.5px;color:var(--muted);margin-top:4px}
+  .sched-last.ok{color:var(--good)} .sched-last.err{color:var(--bad)} .sched-last.run{color:var(--yellow-dim);font-weight:600}
   .sched-del{border:none;background:transparent;color:var(--muted);padding:4px 7px;font-size:14px;border-radius:6px}
   .sched-del:hover{color:var(--bad);background:var(--well)}
   /* iOS-style toggle */
@@ -2330,13 +2331,16 @@ async function loadPullHistory(){
     const r=await fetch("/api/pull/history"); const j=await r.json();
     const h=j.history||[];
     if(!h.length){ box.innerHTML='<div class="pull-hempty">— ยังไม่มีประวัติ —</div>'; return; }
+    const label=x=>{
+      if(x.status==="done") return `ปี ${x.fromYear} · ${(x.rows||0).toLocaleString("en-US")} แถว · ${x.durationSec}s`;
+      if(x.status==="interrupted") return `ปี ${x.fromYear} · ⛔ ถูกขัดจังหวะ (server restart)`;
+      return `ปี ${x.fromYear} · ❌ ${(x.error||"error").slice(0,40)}`;
+    };
     box.innerHTML=h.map(x=>`
       <div class="pull-hrow">
         <span class="pull-hstatus ${x.status==="done"?"done":"err"}"></span>
-        <span class="pull-htime">${fmtWhen(x.at)}</span>
-        <span class="pull-hmeta">${x.status==="done"
-          ? `ปี ${x.fromYear} · ${(x.rows||0).toLocaleString("en-US")} แถว · ${x.durationSec}s`
-          : `ปี ${x.fromYear} · ❌ ${(x.error||"error").slice(0,40)}`}</span>
+        <span class="pull-htime">${fmtWhen(x.at)}${x.origin==="schedule"?' ⏰':''}</span>
+        <span class="pull-hmeta">${label(x)}</span>
       </div>`).join("");
   }catch(e){ box.innerHTML='<div class="pull-hempty">โหลดประวัติไม่สำเร็จ</div>'; }
 }
@@ -2408,7 +2412,16 @@ async function saveSchedules(){
   renderSchedules();
 }
 function isDayOn(s,di){ return !s.days||!s.days.length||s.days.includes(di); }
-function fmtLastRun(ts){ if(!ts) return ""; return `ดึงล่าสุด: ${ts}`; }
+function schedStatusHTML(s){
+  const st=s.lastStatus;
+  if(st==="running") return `<div class="sched-last run">⏳ กำลังดึงอยู่…</div>`;
+  if(st==="interrupted") return `<div class="sched-last err">❌ รอบล่าสุดถูกขัดจังหวะ (server restart)${s.lastSuccess?` · สำเร็จล่าสุด: ${s.lastSuccess}`:""}</div>`;
+  if(st==="error") return `<div class="sched-last err">❌ รอบล่าสุดผิดพลาด${s.lastSuccess?` · สำเร็จล่าสุด: ${s.lastSuccess}`:""}</div>`;
+  if(st==="skipped") return `<div class="sched-last">⏭ ข้ามรอบล่าสุด (มีการดึงอื่นอยู่)${s.lastSuccess?` · สำเร็จล่าสุด: ${s.lastSuccess}`:""}</div>`;
+  if(s.lastSuccess) return `<div class="sched-last ok">✅ ดึงสำเร็จล่าสุด: ${s.lastSuccess}</div>`;
+  if(s.lastTrigger) return `<div class="sched-last err">⚠️ ยิงเมื่อ ${s.lastTrigger} แต่ยังไม่เคยดึงสำเร็จ</div>`;
+  return "";
+}
 function renderSchedules(){
   const box=document.getElementById("schedList");
   if(!schedules.length){ box.innerHTML='<div class="sched-empty">— ยังไม่มีเวลาที่ตั้งไว้ —</div>'; return; }
@@ -2420,7 +2433,7 @@ function renderSchedules(){
           <div class="sched-days">${DOW.map((d,di)=>`<span class="dchip ${isDayOn(s,di)?"on":""}" data-i="${i}" data-d="${di}">${d}</span>`).join("")}</div>
           <span class="sched-year">ปี <input type="number" min="2015" max="2026" value="${s.fromYear}" data-i="${i}" data-k="fromYear"></span>
         </div>
-        ${s.lastRun?`<div class="sched-last">${fmtLastRun(s.lastRun)}</div>`:""}
+        ${schedStatusHTML(s)}
       </div>
       <label class="switch"><input type="checkbox" ${s.enabled?"checked":""} data-i="${i}" data-k="enabled"><span class="slider"></span></label>
       <button class="sched-del" data-i="${i}" title="ลบ">🗑</button>

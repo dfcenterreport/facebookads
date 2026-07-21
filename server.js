@@ -123,16 +123,25 @@ function presetRange(preset) {
 }
 
 // ---------- Pull job (singleton) ----------
-let job = { status: "idle", percent: 0, etaSec: null, done: 0, total: 0, currentLabel: "", startedAt: null, finishedAt: null, fromYear: null, error: null, rows: 0 };
+let job = { status: "idle", percent: 0, etaSec: null, done: 0, total: 0, currentLabel: "", startedAt: null, finishedAt: null, fromYear: null, error: null, rows: 0, origin: null };
 function jobPublic() {
   return { status: job.status, percent: job.percent, etaSec: job.etaSec, done: job.done, total: job.total,
-    currentLabel: job.currentLabel, startedAt: job.startedAt, finishedAt: job.finishedAt, fromYear: job.fromYear, error: job.error, rows: job.rows };
+    currentLabel: job.currentLabel, startedAt: job.startedAt, finishedAt: job.finishedAt, fromYear: job.fromYear, error: job.error, rows: job.rows, origin: job.origin };
 }
-async function runPull(fromYear) {
+// marker บนดิสก์: มีไฟล์นี้ = มี pull กำลังรันอยู่ ถ้า process ตายกลางคัน (server restart) ไฟล์จะค้าง → ใช้ตรวจว่าถูกขัดจังหวะ
+const RUNNING_FILE = "running.json";
+function writeRunning(info) { writeJSON(RUNNING_FILE, info); }
+function clearRunning() { try { fs.unlinkSync(path.join(DATA_DIR, RUNNING_FILE)); } catch (e) {} }
+function historyPush(entry) { history.unshift(entry); history = history.slice(0, 50); writeJSON("history.json", history); }
+
+async function runPull(fromYear, origin) {
   if (job.status === "running") return;
+  origin = origin || { type: "manual" };
   const months = monthChunks(fromYear);
   job = { status: "running", percent: 0, etaSec: null, done: 0, total: PULL_SOURCES.length * months.length,
-    currentLabel: "เริ่มต้น…", startedAt: Date.now(), finishedAt: null, fromYear, error: null, rows: 0 };
+    currentLabel: "เริ่มต้น…", startedAt: Date.now(), finishedAt: null, fromYear, error: null, rows: 0, origin };
+  writeRunning({ startedAt: job.startedAt, fromYear, origin, resumeCount: origin.resumeCount || 0 });
+  if (origin.type === "schedule") updateSchedule(origin.id, { lastStatus: "running", lastTrigger: bkStamp() });
   let totalRows = 0;
   try {
     for (const src of PULL_SOURCES) {
@@ -158,14 +167,14 @@ async function runPull(fromYear) {
     const durationSec = Math.round((job.finishedAt - job.startedAt) / 1000);
     meta = { lastPull: { at: job.finishedAt, fromYear, rows: totalRows, durationSec } };
     writeJSON("meta.json", meta);
-    history.unshift({ at: job.finishedAt, fromYear, rows: totalRows, durationSec, status: "done" });
-    history = history.slice(0, 50);
-    writeJSON("history.json", history);
+    historyPush({ at: job.finishedAt, fromYear, rows: totalRows, durationSec, status: "done", origin: origin.type });
+    if (origin.type === "schedule") updateSchedule(origin.id, { lastStatus: "done", lastSuccess: bkStamp() });
+    clearRunning();
   } catch (e) {
     job.status = "error"; job.error = String(e.message || e); job.finishedAt = Date.now();
-    history.unshift({ at: Date.now(), fromYear, rows: totalRows, durationSec: Math.round((Date.now() - job.startedAt) / 1000), status: "error", error: job.error });
-    history = history.slice(0, 50);
-    writeJSON("history.json", history);
+    historyPush({ at: Date.now(), fromYear, rows: totalRows, durationSec: Math.round((Date.now() - job.startedAt) / 1000), status: "error", error: job.error, origin: origin.type });
+    if (origin.type === "schedule") updateSchedule(origin.id, { lastStatus: "error" });
+    clearRunning();
   }
 }
 
@@ -183,7 +192,8 @@ app.get("/api/pull/status", (_req, res) => res.json(jobPublic()));
 app.get("/api/pull/history", (_req, res) => res.json({ history, lastPull: meta.lastPull }));
 
 // ---------- ตั้งเวลาดึงอัตโนมัติ (scheduler ฝั่ง server → รันแม้ไม่เปิดเว็บ) ----------
-// schedule: { id, time:"HH:MM", days:[0..6] (ว่าง=ทุกวัน, 0=อาทิตย์), fromYear, enabled, lastRun }
+// schedule: { id, time, days[], fromYear, enabled,
+//   lastTrigger (ยิงล่าสุดเมื่อ), lastSuccess (สำเร็จล่าสุดเมื่อ), lastStatus (running/done/error/interrupted/skipped) }
 let schedules = readJSON("schedules.json", []);
 function saveSchedules() { writeJSON("schedules.json", schedules); }
 function normalizeSchedule(s) {
@@ -194,16 +204,29 @@ function normalizeSchedule(s) {
     days: days.length === 7 ? [] : days,     // ครบ 7 วัน = ทุกวัน (เก็บเป็น [])
     fromYear: parseInt(s.fromYear, 10) || 2025,
     enabled: !!s.enabled,
-    lastRun: s.lastRun || null,
+    // migrate: ของเก่ามี lastRun (บันทึกตอน "เริ่ม" ไม่ใช่ "สำเร็จ") → ย้ายไป lastTrigger, ไม่นับว่าสำเร็จ
+    lastTrigger: s.lastTrigger || s.lastRun || null,
+    lastSuccess: s.lastSuccess || null,
+    lastStatus: s.lastStatus || null,
   };
 }
 schedules = schedules.map(normalizeSchedule);
+function updateSchedule(id, patch) {
+  const s = schedules.find(x => x.id === id);
+  if (s) { Object.assign(s, patch); saveSchedules(); }
+}
 
 app.get("/api/schedules", (_req, res) => res.json({ schedules }));
 app.post("/api/schedules", (req, res) => {
   const list = (req.body && req.body.schedules);
   if (!Array.isArray(list)) return res.status(400).json({ error: "schedules ต้องเป็น array" });
-  schedules = list.map(normalizeSchedule);
+  // รักษาสถานะเดิม (lastSuccess/lastStatus) ของ schedule ที่ id ตรงกัน
+  const prev = {}; schedules.forEach(s => prev[s.id] = s);
+  schedules = list.map(s => {
+    const n = normalizeSchedule(s), old = prev[n.id];
+    if (old) { n.lastTrigger = old.lastTrigger; n.lastSuccess = old.lastSuccess; n.lastStatus = old.lastStatus; }
+    return n;
+  });
   saveSchedules();
   res.json({ ok: true, schedules });
 });
@@ -218,6 +241,27 @@ function bangkokParts() {
   const dowMap = { Sun: 0, Mon: 1, Tue: 2, Wed: 3, Thu: 4, Fri: 5, Sat: 6 };
   return { date: `${p.year}-${p.month}-${p.day}`, hm: `${p.hour}:${p.minute}`, dow: dowMap[p.weekday] };
 }
+function bkStamp() { const t = bangkokParts(); return `${t.date} ${t.hm}`; }
+
+// กู้คืนเมื่อ server กลับมา: ถ้ามี marker ค้าง = pull รอบก่อนถูกขัดจังหวะ (server restart กลางคัน)
+function recoverInterrupted() {
+  const r = readJSON(RUNNING_FILE, null);
+  if (!r) return;
+  const durationSec = r.startedAt ? Math.round((Date.now() - r.startedAt) / 1000) : 0;
+  historyPush({ at: Date.now(), fromYear: r.fromYear, rows: 0, durationSec, status: "interrupted",
+    error: "server restart กลางคัน", origin: (r.origin && r.origin.type) || "manual" });
+  if (r.origin && r.origin.type === "schedule") updateSchedule(r.origin.id, { lastStatus: "interrupted" });
+  clearRunning();
+  const resumeCount = (r.resumeCount || 0) + 1;
+  if (resumeCount <= 3) {
+    console.log("[recover] ดึงรอบก่อนถูกขัดจังหวะ → เริ่มใหม่อัตโนมัติ (ครั้งที่", resumeCount + ")");
+    setTimeout(() => runPull(r.fromYear, { ...(r.origin || { type: "manual" }), resumeCount }), 4000);
+  } else {
+    console.log("[recover] ยกเลิก auto-resume (พยายามเกิน 3 ครั้ง)");
+  }
+}
+recoverInterrupted();
+
 // เช็คทุก 30 วิ — ถ้าถึงเวลาที่ตั้งไว้ & เปิดอยู่ → รัน pull (ยิงครั้งเดียวต่อ 1 นาที)
 setInterval(() => {
   const t = bangkokParts();
@@ -225,11 +269,13 @@ setInterval(() => {
   for (const s of schedules) {
     if (!s.enabled || s.time !== t.hm) continue;
     if (s.days && s.days.length && !s.days.includes(t.dow)) continue;
-    if (s.lastRun === stamp) continue;          // ยิงไปแล้วในนาทีนี้
-    s.lastRun = stamp; saveSchedules();
-    if (job.status === "running") { console.log("[schedule] ข้าม (กำลังดึงอยู่)", s.time); continue; }
+    if (s.lastTrigger === stamp) continue;          // ยิงไปแล้วในนาทีนี้
+    if (job.status === "running") {
+      s.lastTrigger = stamp; s.lastStatus = "skipped"; saveSchedules();
+      console.log("[schedule] ข้าม (กำลังดึงอยู่)", s.time); continue;
+    }
     console.log("[schedule] เริ่มดึงอัตโนมัติ", s.time, "fromYear", s.fromYear);
-    runPull(s.fromYear);
+    runPull(s.fromYear, { type: "schedule", id: s.id });   // runPull จะ set lastTrigger/lastStatus เอง
   }
 }, 30000);
 
