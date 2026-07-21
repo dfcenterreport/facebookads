@@ -212,9 +212,11 @@
   .modal-x:hover{background:var(--well);color:var(--ink)}
   .modal-body{padding:18px 20px 22px}
   .pull-desc{font-size:13px;color:var(--muted);line-height:1.6;margin-bottom:16px}
-  .pull-form{display:flex;align-items:flex-end;gap:12px;flex-wrap:wrap;margin-bottom:16px}
-  .pull-form label{display:flex;flex-direction:column;gap:6px;font-size:11px;font-weight:600;letter-spacing:.04em;text-transform:uppercase;color:var(--muted)}
-  .pull-form input{width:120px;font-family:'JetBrains Mono',monospace;font-size:14px}
+  .pull-form{display:flex;align-items:center;gap:10px;flex-wrap:wrap;margin-bottom:8px}
+  .pull-or{font-size:12px;color:var(--muted)}
+  .pull-full-lbl{display:flex;align-items:center;gap:7px;font-size:12px;color:var(--muted)}
+  .pull-form input{width:80px;font-family:'JetBrains Mono',monospace;font-size:14px}
+  .pull-hint{font-size:11.5px;color:var(--muted);line-height:1.6;margin-bottom:16px}
   .pull-progress{margin:6px 0 14px}
   .pbar{height:12px;background:var(--well);border:1px solid var(--border);border-radius:999px;overflow:hidden}
   .pbar-fill{height:100%;width:0;background:linear-gradient(90deg,var(--yellow),var(--yellow-dim));transition:width .4s ease}
@@ -256,6 +258,7 @@
   .dchip.on{background:var(--yellow);color:var(--ink);border-color:var(--yellow)}
   .sched-year{font-size:11px;color:var(--muted);display:flex;align-items:center;gap:5px}
   .sched-year input{width:66px;font-size:12px;padding:3px 6px;font-family:'JetBrains Mono',monospace}
+  .sched-mode{font-size:11.5px;padding:3px 6px;border:1px solid var(--border);border-radius:4px;background:var(--surface);color:var(--text)}
   .sched-last{font-size:10.5px;color:var(--muted);margin-top:4px}
   .sched-last.ok{color:var(--good)} .sched-last.err{color:var(--bad)} .sched-last.run{color:var(--yellow-dim);font-weight:600}
   .sched-del{border:none;background:transparent;color:var(--muted);padding:4px 7px;font-size:14px;border-radius:6px}
@@ -400,11 +403,14 @@
     <div class="modal-body">
       <p class="pull-desc">ดึงข้อมูลล่าสุดจาก Windsor มาเก็บไว้ในฐานข้อมูล เพื่อให้เปิดเว็บแล้วโหลดเร็วขึ้น (หน้าเว็บจะอ่านจากฐานข้อมูลนี้ ไม่ยิง Windsor ตอนเปิด)</p>
       <div class="pull-form">
-        <label>ดึงข้อมูลตั้งแต่ปี (ค.ศ.)
+        <button class="btn-primary" id="pullInc">⚡ ดึงข้อมูลใหม่ (เดือนล่าสุด)</button>
+        <span class="pull-or">หรือ</span>
+        <label class="pull-full-lbl">ดึงใหม่ทั้งหมดตั้งแต่ปี
           <input type="number" id="pullYear" value="2025" min="2015" max="2026" step="1">
         </label>
-        <button class="btn-primary" id="pullStart">▶ เริ่มดึงข้อมูล</button>
+        <button id="pullFull">↻ ทั้งหมด</button>
       </div>
+      <div class="pull-hint">⚡ <b>ดึงข้อมูลใหม่</b> = อัปเดตเฉพาะเดือนก่อน+เดือนปัจจุบัน แล้ว merge เข้าของเดิม (เร็ว ~ไม่กี่นาที) · <b>ทั้งหมด</b> = ดึงใหม่ตั้งแต่ปีที่เลือก (ช้า ~ชม. ใช้ตอนสร้างฐานข้อมูลครั้งแรก/สร้างใหม่)</div>
       <div class="pull-progress" id="pullProgress" style="display:none">
         <div class="pbar"><div class="pbar-fill" id="pbarFill"></div></div>
         <div class="pull-status">
@@ -2331,10 +2337,11 @@ async function loadPullHistory(){
     const r=await fetch("/api/pull/history"); const j=await r.json();
     const h=j.history||[];
     if(!h.length){ box.innerHTML='<div class="pull-hempty">— ยังไม่มีประวัติ —</div>'; return; }
+    const m=x=>x.mode==="incremental"?"⚡ ":(x.mode==="full"?"↻ ":"");
     const label=x=>{
-      if(x.status==="done") return `ปี ${x.fromYear} · ${(x.rows||0).toLocaleString("en-US")} แถว · ${x.durationSec}s`;
-      if(x.status==="interrupted") return `ปี ${x.fromYear} · ⛔ ถูกขัดจังหวะ (server restart)`;
-      return `ปี ${x.fromYear} · ❌ ${(x.error||"error").slice(0,40)}`;
+      if(x.status==="done") return `${m(x)}${(x.rows||0).toLocaleString("en-US")} แถว · ${x.durationSec}s`;
+      if(x.status==="interrupted") return `${m(x)}⛔ ถูกขัดจังหวะ (server restart)`;
+      return `${m(x)}❌ ${(x.error||"error").slice(0,40)}`;
     };
     box.innerHTML=h.map(x=>`
       <div class="pull-hrow">
@@ -2350,12 +2357,14 @@ function renderPullStatus(s){
   prog.style.display = (running||s.status==="done"||s.status==="error") ? "block" : "none";
   document.getElementById("pbarFill").style.width=(s.percent||0)+"%";
   document.getElementById("pullPct").textContent=(s.percent||0)+"%";
-  document.getElementById("pullLabel").textContent = running ? `กำลังดึง: ${s.currentLabel||"…"} (${s.done}/${s.total})` : (s.currentLabel||"");
+  const modeTag = s.mode==="incremental" ? "⚡ " : (s.mode==="full" ? "↻ " : "");
+  document.getElementById("pullLabel").textContent = running ? `${modeTag}กำลังดึง: ${s.currentLabel||"…"} (${s.done}/${s.total})` : (s.currentLabel||"");
   document.getElementById("pullEta").textContent = running ? fmtEta(s.etaSec) : "";
-  document.getElementById("pullStart").disabled = running;
+  document.getElementById("pullInc").disabled = running;
+  document.getElementById("pullFull").disabled = running;
   document.getElementById("pullYear").disabled = running;
   const msg=document.getElementById("pullMsg");
-  if(s.status==="done"){ msg.className="pull-msg ok"; msg.textContent=`✅ ดึงข้อมูลเสร็จ · ${(s.rows||0).toLocaleString("en-US")} แถว`; }
+  if(s.status==="done"){ msg.className="pull-msg ok"; msg.textContent=`✅ ดึงข้อมูลเสร็จ${s.mode==="incremental"?" (อัปเดตเดือนล่าสุด)":""} · ${(s.rows||0).toLocaleString("en-US")} แถว`; }
   else if(s.status==="error"){ msg.className="pull-msg err"; msg.textContent=`❌ ${s.error||"ดึงข้อมูลไม่สำเร็จ"}`; }
   else if(running){ msg.className="pull-msg"; msg.textContent=""; }
 }
@@ -2384,20 +2393,25 @@ function openPullModal(){
 function closePullModal(){ document.getElementById("pullOverlay").classList.remove("open"); }
 document.getElementById("pullClose").onclick=closePullModal;
 document.getElementById("pullOverlay").onclick=e=>{ if(e.target.id==="pullOverlay") closePullModal(); };
-document.getElementById("pullStart").onclick=async()=>{
+async function startPull(mode){
   const year=parseInt(document.getElementById("pullYear").value,10)||2025;
   const msg=document.getElementById("pullMsg");
-  // ยืนยันก่อนเริ่ม — การดึงตั้งแต่ต้นปีใช้เวลานาน (อาจหลายสิบนาที–ชั่วโมง) และจะเขียนทับข้อมูลเดิมใน DB
-  if(!confirm(`แน่ใจหรือไม่ว่าจะเริ่มดึงข้อมูลจาก Windsor ตั้งแต่ปี ${year} ?\n\n• ใช้เวลานาน (อาจหลายสิบนาทีถึงหลายชั่วโมง ขึ้นกับปริมาณข้อมูล)\n• ข้อมูลเดิมในฐานข้อมูลจะถูกเขียนทับด้วยชุดใหม่\n\nกด OK เพื่อเริ่มดึง`)) return;
+  if(mode==="full"){
+    if(!confirm(`ดึงใหม่ทั้งหมดตั้งแต่ปี ${year} ?\n\n• ใช้เวลานาน (อาจหลายสิบนาทีถึงหลายชั่วโมง)\n• เขียนทับข้อมูลเดิมทั้งชุด\n\nปกติใช้แค่ตอนสร้างฐานข้อมูลครั้งแรก — การอัปเดตรายวันใช้ “⚡ ดึงข้อมูลใหม่” พอ\n\nกด OK เพื่อเริ่ม`)) return;
+  }else{
+    if(!confirm("ดึงข้อมูลใหม่ (เดือนก่อน + เดือนปัจจุบัน) แล้ว merge เข้าของเดิม?\n\nเร็ว ใช้เวลาไม่กี่นาที · ข้อมูลเดือนเก่าคงไว้\n\nกด OK เพื่อเริ่ม")) return;
+  }
   msg.className="pull-msg"; msg.textContent="";
   try{
-    const r=await fetch(`/api/pull?fromYear=${year}`,{method:"POST"});
+    const r=await fetch(`/api/pull?mode=${mode}&fromYear=${year}`,{method:"POST"});
     const j=await r.json();
     if(!r.ok){ msg.className="pull-msg err"; msg.textContent=`❌ ${j.error||"เริ่มดึงข้อมูลไม่สำเร็จ"}`; if(j.status) renderPullStatus(j.status); return; }
     renderPullStatus(j.status||{status:"running",percent:0,done:0,total:0});
     if(!pullPoll) pullPoll=setInterval(pollPullStatus,1500);
   }catch(e){ msg.className="pull-msg err"; msg.textContent="❌ เชื่อมต่อ server ไม่ได้"; }
-};
+}
+document.getElementById("pullInc").onclick=()=>startPull("incremental");
+document.getElementById("pullFull").onclick=()=>startPull("full");
 
 /* ---- ตั้งเวลาดึงอัตโนมัติ (server-side scheduler) ---- */
 let schedules=[];
@@ -2431,7 +2445,11 @@ function renderSchedules(){
         <input type="time" class="sched-time" value="${s.time}" data-i="${i}" data-k="time">
         <div class="sched-sub">
           <div class="sched-days">${DOW.map((d,di)=>`<span class="dchip ${isDayOn(s,di)?"on":""}" data-i="${i}" data-d="${di}">${d}</span>`).join("")}</div>
-          <span class="sched-year">ปี <input type="number" min="2015" max="2026" value="${s.fromYear}" data-i="${i}" data-k="fromYear"></span>
+          <select class="sched-mode" data-i="${i}" data-k="mode">
+            <option value="incremental" ${s.mode!=="full"?"selected":""}>⚡ เดือนล่าสุด</option>
+            <option value="full" ${s.mode==="full"?"selected":""}>↻ ทั้งหมด</option>
+          </select>
+          ${s.mode==="full"?`<span class="sched-year">ปี <input type="number" min="2015" max="2026" value="${s.fromYear}" data-i="${i}" data-k="fromYear"></span>`:""}
         </div>
         ${schedStatusHTML(s)}
       </div>
@@ -2441,7 +2459,7 @@ function renderSchedules(){
 }
 document.getElementById("schedAdd").onclick=()=>{
   const y=parseInt(document.getElementById("pullYear").value,10)||2025;
-  schedules.push({time:"08:00",days:[],fromYear:y,enabled:true,lastRun:null});
+  schedules.push({time:"08:00",days:[],fromYear:y,mode:"incremental",enabled:true});
   saveSchedules();
 };
 document.getElementById("schedList").addEventListener("click",e=>{
@@ -2462,6 +2480,7 @@ document.getElementById("schedList").addEventListener("change",e=>{
   if(k==="enabled") schedules[i].enabled=el.checked;
   else if(k==="fromYear") schedules[i].fromYear=parseInt(el.value,10)||2025;
   else if(k==="time") schedules[i].time=el.value;
+  else if(k==="mode") schedules[i].mode=el.value;
   saveSchedules();
 });
 

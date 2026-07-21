@@ -87,12 +87,12 @@ async function windsorFetch(connector, params) {
 
 // ---------- date helpers ----------
 function todayStr() { return new Date().toISOString().slice(0, 10); }
-function monthChunks(fromYear) {
+function monthChunks(fromYear, fromMonth0) {
   const chunks = [];
   const now = new Date();
   const endY = now.getUTCFullYear(), endM = now.getUTCMonth();
   const today = todayStr();
-  let y = fromYear, m = 0;
+  let y = fromYear, m = fromMonth0 || 0;
   while (y < endY || (y === endY && m <= endM)) {
     const mm = String(m + 1).padStart(2, "0");
     const from = `${y}-${mm}-01`;
@@ -126,10 +126,17 @@ function presetRange(preset) {
 }
 
 // ---------- Pull job (singleton) ----------
-let job = { status: "idle", percent: 0, etaSec: null, done: 0, total: 0, currentLabel: "", startedAt: null, finishedAt: null, fromYear: null, error: null, rows: 0, origin: null };
+let job = { status: "idle", percent: 0, etaSec: null, done: 0, total: 0, currentLabel: "", startedAt: null, finishedAt: null, fromYear: null, error: null, rows: 0, origin: null, mode: null };
 function jobPublic() {
   return { status: job.status, percent: job.percent, etaSec: job.etaSec, done: job.done, total: job.total,
-    currentLabel: job.currentLabel, startedAt: job.startedAt, finishedAt: job.finishedAt, fromYear: job.fromYear, error: job.error, rows: job.rows, origin: job.origin };
+    currentLabel: job.currentLabel, startedAt: job.startedAt, finishedAt: job.finishedAt, fromYear: job.fromYear, error: job.error, rows: job.rows, origin: job.origin, mode: job.mode };
+}
+// incremental: ดึงเฉพาะ "เดือนก่อน + เดือนปัจจุบัน" แล้ว merge ทับช่วงนั้น (ข้อมูลเก่ากว่านั้นคงไว้) → เร็ว
+function incrementalStart() {
+  const now = new Date();
+  let y = now.getUTCFullYear(), m = now.getUTCMonth() - 1;   // เดือนก่อน
+  if (m < 0) { m = 11; y -= 1; }
+  return { year: y, month0: m, dateStr: `${y}-${String(m + 1).padStart(2, "0")}-01` };
 }
 // marker บนดิสก์: มีไฟล์นี้ = มี pull กำลังรันอยู่ ถ้า process ตายกลางคัน (server restart) ไฟล์จะค้าง → ใช้ตรวจว่าถูกขัดจังหวะ
 const RUNNING_FILE = "running.json";
@@ -137,20 +144,28 @@ function writeRunning(info) { writeJSON(RUNNING_FILE, info); }
 function clearRunning() { try { fs.unlinkSync(path.join(DATA_DIR, RUNNING_FILE)); } catch (e) {} }
 function historyPush(entry) { history.unshift(entry); history = history.slice(0, 50); writeJSON("history.json", history); }
 
-async function runPull(fromYear, origin) {
+async function runPull(fromYear, origin, mode) {
   if (job.status === "running") return;
   origin = origin || { type: "manual" };
-  const months = monthChunks(fromYear);
+  mode = mode === "incremental" ? "incremental" : "full";
+  let months, rangeStart = null;
+  if (mode === "incremental") {
+    const inc = incrementalStart();
+    months = monthChunks(inc.year, inc.month0);   // เดือนก่อน → ปัจจุบัน
+    rangeStart = inc.dateStr;
+  } else {
+    months = monthChunks(fromYear, 0);            // ทั้งปี fromYear → ปัจจุบัน
+  }
   job = { status: "running", percent: 0, etaSec: null, done: 0, total: PULL_SOURCES.length * months.length,
-    currentLabel: "เริ่มต้น…", startedAt: Date.now(), finishedAt: null, fromYear, error: null, rows: 0, origin };
-  writeRunning({ startedAt: job.startedAt, fromYear, origin, resumeCount: origin.resumeCount || 0 });
+    currentLabel: "เริ่มต้น…", startedAt: Date.now(), finishedAt: null, fromYear, error: null, rows: 0, origin, mode };
+  writeRunning({ startedAt: job.startedAt, fromYear, origin, mode, resumeCount: origin.resumeCount || 0 });
   if (origin.type === "schedule") updateSchedule(origin.id, { lastStatus: "running", lastTrigger: bkStamp() });
   let totalRows = 0;
   try {
     for (const src of PULL_SOURCES) {
       const rows = [];
       for (const ch of months) {
-        job.currentLabel = `${src.key} · ${ch.from.slice(0, 7)}`;
+        job.currentLabel = `${src.key} · ${ch.from.slice(0, 7)}${mode === "incremental" ? " (อัปเดต)" : ""}`;
         let got = null;
         for (const fields of src.tiers) {
           try { got = await windsorFetch(src.windsor, `date_from=${ch.from}&date_to=${ch.to}&fields=${fields}`); break; }
@@ -162,27 +177,35 @@ async function runPull(fromYear, origin) {
         job.percent = Math.round(job.done / job.total * 100);
         job.etaSec = job.done > 0 ? Math.round(elapsed / job.done * (job.total - job.done)) : null;
       }
-      const prevCount = (store[src.key] || []).length;
-      if (rows.length === 0 && prevCount > 0) {
-        // ได้ 0 แถว แต่ของเดิมมีข้อมูล → น่าจะ error ชั่วคราว ไม่เขียนทับ (กันข้อมูลหายเหมือนเคส facebook)
-        console.log(`[pull] ${src.key}: ได้ 0 แถว (เดิมมี ${prevCount}) → คงข้อมูลเดิมไว้`);
-        totalRows += prevCount;
-      } else {
-        store[src.key] = rows;
-        writeJSON(src.key + ".json", rows);
-        totalRows += rows.length;
+      const prevData = store[src.key] || [];
+      if (rows.length === 0 && prevData.length > 0) {
+        // ได้ 0 แถว แต่ของเดิมมีข้อมูล → น่าจะ error ชั่วคราว ไม่แตะข้อมูลเดิม (กันข้อมูลหายเหมือนเคส facebook)
+        console.log(`[pull] ${src.key}: ได้ 0 แถว (เดิมมี ${prevData.length}) → คงข้อมูลเดิมไว้`);
+        totalRows += prevData.length;
+        continue;
       }
+      let finalRows;
+      if (mode === "incremental") {
+        // เก็บข้อมูลเดิมที่เก่ากว่า rangeStart ไว้ + เอาข้อมูลใหม่มาแทนช่วง [rangeStart → ปัจจุบัน]
+        const kept = prevData.filter(r => !r.date || r.date < rangeStart);
+        finalRows = kept.concat(rows);
+      } else {
+        finalRows = rows;
+      }
+      store[src.key] = finalRows;
+      writeJSON(src.key + ".json", finalRows);
+      totalRows += finalRows.length;
     }
     job.status = "done"; job.finishedAt = Date.now(); job.percent = 100; job.etaSec = 0; job.rows = totalRows; job.currentLabel = "เสร็จสิ้น";
     const durationSec = Math.round((job.finishedAt - job.startedAt) / 1000);
-    meta = { lastPull: { at: job.finishedAt, fromYear, rows: totalRows, durationSec } };
+    meta = { lastPull: { at: job.finishedAt, fromYear, rows: totalRows, durationSec, mode } };
     writeJSON("meta.json", meta);
-    historyPush({ at: job.finishedAt, fromYear, rows: totalRows, durationSec, status: "done", origin: origin.type });
+    historyPush({ at: job.finishedAt, fromYear, rows: totalRows, durationSec, status: "done", origin: origin.type, mode });
     if (origin.type === "schedule") updateSchedule(origin.id, { lastStatus: "done", lastSuccess: bkStamp() });
     clearRunning();
   } catch (e) {
     job.status = "error"; job.error = String(e.message || e); job.finishedAt = Date.now();
-    historyPush({ at: Date.now(), fromYear, rows: totalRows, durationSec: Math.round((Date.now() - job.startedAt) / 1000), status: "error", error: job.error, origin: origin.type });
+    historyPush({ at: Date.now(), fromYear, rows: totalRows, durationSec: Math.round((Date.now() - job.startedAt) / 1000), status: "error", error: job.error, origin: origin.type, mode });
     if (origin.type === "schedule") updateSchedule(origin.id, { lastStatus: "error" });
     clearRunning();
   }
@@ -195,7 +218,8 @@ app.post("/api/pull", (req, res) => {
   const raw = req.query.fromYear || (req.body && req.body.fromYear) || "2025";
   let fromYear = parseInt(raw, 10);
   if (!fromYear || fromYear < 2015 || fromYear > new Date().getUTCFullYear()) fromYear = 2025;
-  runPull(fromYear); // fire-and-forget
+  const mode = (req.query.mode || (req.body && req.body.mode)) === "incremental" ? "incremental" : "full";
+  runPull(fromYear, { type: "manual" }, mode); // fire-and-forget
   res.json({ ok: true, status: jobPublic() });
 });
 app.get("/api/pull/status", (_req, res) => res.json(jobPublic()));
@@ -213,6 +237,7 @@ function normalizeSchedule(s) {
     time: /^\d{2}:\d{2}$/.test(s.time) ? s.time : "08:00",
     days: days.length === 7 ? [] : days,     // ครบ 7 วัน = ทุกวัน (เก็บเป็น [])
     fromYear: parseInt(s.fromYear, 10) || 2025,
+    mode: s.mode === "full" ? "full" : "incremental",   // ค่าเริ่มต้น = incremental (เร็ว)
     enabled: !!s.enabled,
     // migrate: ของเก่ามี lastRun (บันทึกตอน "เริ่ม" ไม่ใช่ "สำเร็จ") → ย้ายไป lastTrigger, ไม่นับว่าสำเร็จ
     lastTrigger: s.lastTrigger || s.lastRun || null,
@@ -265,7 +290,7 @@ function recoverInterrupted() {
   const resumeCount = (r.resumeCount || 0) + 1;
   if (resumeCount <= 3) {
     console.log("[recover] ดึงรอบก่อนถูกขัดจังหวะ → เริ่มใหม่อัตโนมัติ (ครั้งที่", resumeCount + ")");
-    setTimeout(() => runPull(r.fromYear, { ...(r.origin || { type: "manual" }), resumeCount }), 4000);
+    setTimeout(() => runPull(r.fromYear, { ...(r.origin || { type: "manual" }), resumeCount }, r.mode), 4000);
   } else {
     console.log("[recover] ยกเลิก auto-resume (พยายามเกิน 3 ครั้ง)");
   }
@@ -284,8 +309,8 @@ setInterval(() => {
       s.lastTrigger = stamp; s.lastStatus = "skipped"; saveSchedules();
       console.log("[schedule] ข้าม (กำลังดึงอยู่)", s.time); continue;
     }
-    console.log("[schedule] เริ่มดึงอัตโนมัติ", s.time, "fromYear", s.fromYear);
-    runPull(s.fromYear, { type: "schedule", id: s.id });   // runPull จะ set lastTrigger/lastStatus เอง
+    console.log("[schedule] เริ่มดึงอัตโนมัติ", s.time, "fromYear", s.fromYear, "mode", s.mode);
+    runPull(s.fromYear, { type: "schedule", id: s.id }, s.mode);   // runPull จะ set lastTrigger/lastStatus เอง
   }
 }, 30000);
 
