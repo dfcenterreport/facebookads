@@ -29,11 +29,13 @@ const PULL_SOURCES = [
     "source,account_name,account_id,campaign,spend,impressions,reach,clicks,date",
   ]},
   { key: "facebook", windsor: "facebook", tiers: [
-    // ชุดใหญ่สุด: base + story/thumbnail + metric (raw count) สำหรับ Ad Benchmark — ถ้า field ไม่ valid จะถอยไปชุดล่าง
-    "source,account_name,account_id,campaign,adset_name,ad_name,spend,impressions,reach,clicks,date,thumbnail_url,object_story_id,effective_object_story_id,video_views,video_thruplay_watched_actions,post_engagement,outbound_clicks,actions_omni_add_to_cart,actions_omni_purchase,actions_omni_view_content,actions_onsite_conversion_messaging_conversation_started_7d",
-    // metric ชุดปลอดภัย (video/engagement/outbound) — ถ้า actions_* พัง ยังได้ VR%/Thruplay/ER%/Outbound
-    "source,account_name,account_id,campaign,adset_name,ad_name,spend,impressions,reach,clicks,date,thumbnail_url,object_story_id,effective_object_story_id,video_views,video_thruplay_watched_actions,post_engagement,outbound_clicks",
-    // NB: permalink_url ไม่ valid สำหรับ facebook connector → ใช้ object_story_id แปลงเป็นลิงก์โพสต์แทน
+    // ใช้ field ที่ยืนยันแล้วว่า valid (cost_per_* + actions_omni_* + outbound) — ซอย tier ถ้าตัวเสี่ยงพัง ยังได้ metric หลัก
+    "source,account_name,account_id,campaign,adset_name,ad_name,spend,impressions,reach,clicks,date,thumbnail_url,object_story_id,effective_object_story_id,cost_per_action_type_video_view,cost_per_thruplay_video_view,cost_per_action_type_page_engagement,outbound_clicks_outbound_click,actions_omni_add_to_cart,actions_omni_purchase,actions_omni_view_content,actions_onsite_conversion_messaging_conversation_started_7d",
+    // core metric (CPV/Thruplay/CPE/Outbound) — ถ้า actions_omni_* พัง ยังได้ 4 ตัวนี้
+    "source,account_name,account_id,campaign,adset_name,ad_name,spend,impressions,reach,clicks,date,thumbnail_url,object_story_id,effective_object_story_id,cost_per_action_type_video_view,cost_per_thruplay_video_view,cost_per_action_type_page_engagement,outbound_clicks_outbound_click",
+    // CPV/Thruplay/CPE เท่านั้น (ถ้า outbound พัง)
+    "source,account_name,account_id,campaign,adset_name,ad_name,spend,impressions,reach,clicks,date,thumbnail_url,object_story_id,effective_object_story_id,cost_per_action_type_video_view,cost_per_thruplay_video_view,cost_per_action_type_page_engagement",
+    // ไม่มี metric (permalink_url ไม่ valid → ใช้ object_story_id แปลงลิงก์)
     "source,account_name,account_id,campaign,adset_name,ad_name,spend,impressions,reach,clicks,date,thumbnail_url,object_story_id,effective_object_story_id",
     "source,account_name,account_id,campaign,adset_name,ad_name,spend,impressions,reach,clicks,date,thumbnail_url",
     "source,account_name,account_id,campaign,adset_name,ad_name,spend,impressions,reach,clicks,date",
