@@ -383,6 +383,14 @@
   .setting-user{padding:10px 14px;border-bottom:1px solid var(--border);font-size:12px}
   .setting-user b{display:block;color:var(--ink);font-size:13px}
   .setting-user span{color:var(--muted)}
+  /* user box in topnav (avatar + role) */
+  .user-box{display:flex;align-items:center;gap:9px}
+  .user-avatar{width:34px;height:34px;border-radius:50%;object-fit:cover;background:var(--well);border:1px solid var(--border);flex:0 0 auto}
+  .user-avatar.ph{display:flex;align-items:center;justify-content:center;font-size:16px;color:var(--gray)}
+  .user-meta{display:flex;flex-direction:column;line-height:1.2;max-width:170px}
+  .user-name{font-size:13px;font-weight:600;color:var(--ink);white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+  .user-role{font-size:11px;color:var(--muted);white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+  @media(max-width:820px){.user-meta{display:none}}
 </style>
 </head>
 <body>
@@ -410,6 +418,10 @@
       <div class="topnav-tab" data-view="biddable">Creative Report</div>
       <div class="topnav-tab" data-view="benchmark">Ad Benchmark</div>
       <div class="topnav-tab" data-view="activeacct">Active Ad account</div>
+    </div>
+    <div class="user-box" id="userBox" style="display:none">
+      <img class="user-avatar" id="userAvatar" alt="">
+      <div class="user-meta"><span class="user-name" id="userName">—</span><span class="user-role" id="userRole"></span></div>
     </div>
     <div class="setting-menu" id="settingMenu">
       <div class="setting-btn" id="settingBtn">⚙️ Setting <span class="setting-caret">▾</span></div>
@@ -2572,19 +2584,46 @@ async function authLogin(user, pass){
   let d; try{ d=await res.json(); }catch(e){ throw new Error("เข้าสู่ระบบไม่สำเร็จ"); }
   if(!d || !d.access_token) throw new Error("เข้าสู่ระบบไม่สำเร็จ");
   authSet({ access_token:d.access_token, expiration:d.expiration||null,
-    name:d.empEngName||d.empThaiName||user, position:d.positionName||"", dept:d.departmentName||"" });
+    name:d.empEngName||d.empThaiName||user, position:d.positionName||"", dept:d.departmentName||"",
+    photo:d.profileURL||"" });
   return d;
 }
+// Operation 2 — Get Profile: เอา role (userRole) + รูปโปรไฟล์ ; เติมเข้า session
+async function ensureProfile(){
+  const s=authGet(); if(!s) return;
+  if(s.role!=null) return;   // มีแล้ว ไม่ต้องดึงซ้ำ
+  try{
+    const ep = USE_PROXY ? "/api/auth/profile" : "https://api.fareastfamelineddb.com/api/User/Profile";
+    const res = await fetch(ep, { headers:{ Authorization:"Bearer "+s.access_token } });
+    if(res.status===401){ doLogout(); return; }
+    if(!res.ok) return;
+    const d = await res.json();
+    const p = (d && d.profile) || {};
+    const roles = Array.isArray(d && d.userRole) ? d.userRole.filter(Boolean) : [];
+    let photo = p.profileURL || s.photo || "";
+    if(!photo && p.wazzupPhotoBase64){ const b=p.wazzupPhotoBase64; photo = b.startsWith("data:") ? b : ("data:image/"+String(p.wazzupPhotoFileType||"png").replace(/^\./,"")+";base64,"+b); }
+    const merged = {...s, role: roles.join(", ")||s.position||"", photo, name: p.empEngName||p.empThaiName||s.name };
+    authSet(merged); renderUserChip(merged);
+  }catch(e){ /* เงียบ — ยังใช้ข้อมูลจาก login ได้ */ }
+}
 function renderUserChip(s){
-  const u=document.getElementById("settingUser"); if(!u) return;
-  document.getElementById("settingUserName").textContent=s.name||"—";
-  document.getElementById("settingUserPos").textContent=[s.position,s.dept].filter(Boolean).join(" · ");
-  u.style.display="block";
+  const u=document.getElementById("settingUser");
+  if(u){ document.getElementById("settingUserName").textContent=s.name||"—";
+    document.getElementById("settingUserPos").textContent=[s.position,s.dept].filter(Boolean).join(" · "); u.style.display="block"; }
+  const box=document.getElementById("userBox");
+  if(box){
+    document.getElementById("userName").textContent=s.name||"—";
+    document.getElementById("userRole").textContent=s.role||s.position||"";
+    const av=document.getElementById("userAvatar");
+    if(s.photo){ av.src=s.photo; av.classList.remove("ph"); av.textContent=""; av.style.display=""; av.onerror=()=>{ av.style.display="none"; }; }
+    else { av.removeAttribute("src"); av.style.display="none"; }
+    box.style.display="flex";
+  }
 }
 function doLogout(){ authClear(); location.reload(); }
 function authInit(){
   const s=authGet();
-  if(s){ document.getElementById("loginView").style.display="none"; renderUserChip(s); showLanding(); }
+  if(s){ document.getElementById("loginView").style.display="none"; renderUserChip(s); showLanding(); ensureProfile(); }
   else { document.getElementById("loginView").style.display="flex"; }
 }
 document.getElementById("loginForm").onsubmit=async e=>{
