@@ -1,5 +1,7 @@
 import { useEffect, useState } from "react";
 import { cn } from "@/lib/utils";
+import { doLogout } from "@/lib/auth";
+import LoginGate from "@/components/LoginGate.jsx";
 import Landing from "@/views/Landing.jsx";
 import Dashboard from "@/views/Dashboard.jsx";
 import CreativeReport from "@/views/CreativeReport.jsx";
@@ -14,6 +16,10 @@ const TABS = [
 ];
 
 export default function App() {
+  return <LoginGate>{(session) => <Shell session={session} />}</LoginGate>;
+}
+
+function Shell({ session }) {
   const [tab, setTab] = useState("app");
   const [inDashboard, setInDashboard] = useState(false);
   const [account, setAccount] = useState("__all__");
@@ -30,16 +36,36 @@ export default function App() {
     <>
       <nav className="topnav">
         <div className="topnav-brand">📊 Windsor Media</div>
-        <div className="topnav-tabs">
-          {TABS.map((t) => (
-            <div
-              key={t.key}
-              className={cn("topnav-tab", tab === t.key && "active")}
-              onClick={() => setTab(t.key)}
-            >
-              {t.label}
+        <div className="topnav-right">
+          <div className="topnav-tabs">
+            {TABS.map((t) => (
+              <div
+                key={t.key}
+                className={cn("topnav-tab", tab === t.key && "active")}
+                onClick={() => setTab(t.key)}
+              >
+                {t.label}
+              </div>
+            ))}
+          </div>
+          <div className="user-box">
+            {session.photo ? (
+              <img className="user-avatar" src={session.photo} alt="" />
+            ) : (
+              <div className="user-avatar ph">👤</div>
+            )}
+            <div className="user-meta">
+              <span className="user-name">{session.name || "—"}</span>
+              <span className="user-role">{session.role || session.position || ""}</span>
             </div>
-          ))}
+            <button
+              className="logout-btn"
+              title="ออกจากระบบ"
+              onClick={() => { if (confirm("ออกจากระบบ?")) doLogout(); }}
+            >
+              🚪
+            </button>
+          </div>
         </div>
       </nav>
 
