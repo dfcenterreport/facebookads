@@ -2575,6 +2575,21 @@ function authGet(){
 }
 function authSet(s){ try{ sessionStorage.setItem(AUTH_KEY, JSON.stringify(s)); }catch(e){} }
 function authClear(){ try{ sessionStorage.removeItem(AUTH_KEY); }catch(e){} }
+const REQUIRED_ROLE=/windsor\s*admin/i;   // ต้องมี role นี้ถึงเข้าระบบได้
+async function authFetchProfile(token){
+  const ep = USE_PROXY ? "/api/auth/profile" : "https://api.fareastfamelineddb.com/api/User/Profile";
+  const res = await fetch(ep, { headers:{ Authorization:"Bearer "+token } });
+  if(res.status===401) throw Object.assign(new Error("session expired"),{code:401});
+  if(!res.ok) throw new Error("ตรวจสอบสิทธิ์ไม่สำเร็จ");
+  return await res.json();
+}
+function profileParts(d, fallback){
+  const p=(d&&d.profile)||{};
+  const roles=Array.isArray(d&&d.userRole)?d.userRole.filter(Boolean):[];
+  let photo=p.profileURL||fallback.photo||"";
+  if(!photo && p.wazzupPhotoBase64){ const b=p.wazzupPhotoBase64; photo=b.startsWith("data:")?b:("data:image/"+String(p.wazzupPhotoFileType||"png").replace(/^\./,"")+";base64,"+b); }
+  return { roles, photo, name:p.empEngName||p.empThaiName||fallback.name };
+}
 async function authLogin(user, pass){
   const ep = USE_PROXY ? "/api/auth/login" : "https://api.fareastfamelineddb.com/api/User/Authentication";
   const res = await fetch(ep, { method:"POST", headers:{"Content-Type":"application/json"},
@@ -2583,28 +2598,13 @@ async function authLogin(user, pass){
   if(!res.ok) throw new Error("เข้าสู่ระบบไม่สำเร็จ กรุณาลองใหม่");
   let d; try{ d=await res.json(); }catch(e){ throw new Error("เข้าสู่ระบบไม่สำเร็จ"); }
   if(!d || !d.access_token) throw new Error("เข้าสู่ระบบไม่สำเร็จ");
-  authSet({ access_token:d.access_token, expiration:d.expiration||null,
-    name:d.empEngName||d.empThaiName||user, position:d.positionName||"", dept:d.departmentName||"",
-    photo:d.profileURL||"" });
-  return d;
-}
-// Operation 2 — Get Profile: เอา role (userRole) + รูปโปรไฟล์ ; เติมเข้า session
-async function ensureProfile(){
-  const s=authGet(); if(!s) return;
-  if(s.role!=null) return;   // มีแล้ว ไม่ต้องดึงซ้ำ
-  try{
-    const ep = USE_PROXY ? "/api/auth/profile" : "https://api.fareastfamelineddb.com/api/User/Profile";
-    const res = await fetch(ep, { headers:{ Authorization:"Bearer "+s.access_token } });
-    if(res.status===401){ doLogout(); return; }
-    if(!res.ok) return;
-    const d = await res.json();
-    const p = (d && d.profile) || {};
-    const roles = Array.isArray(d && d.userRole) ? d.userRole.filter(Boolean) : [];
-    let photo = p.profileURL || s.photo || "";
-    if(!photo && p.wazzupPhotoBase64){ const b=p.wazzupPhotoBase64; photo = b.startsWith("data:") ? b : ("data:image/"+String(p.wazzupPhotoFileType||"png").replace(/^\./,"")+";base64,"+b); }
-    const merged = {...s, role: roles.join(", ")||s.position||"", photo, name: p.empEngName||p.empThaiName||s.name };
-    authSet(merged); renderUserChip(merged);
-  }catch(e){ /* เงียบ — ยังใช้ข้อมูลจาก login ได้ */ }
+  const base={ access_token:d.access_token, expiration:d.expiration||null,
+    name:d.empEngName||d.empThaiName||user, position:d.positionName||"", dept:d.departmentName||"", photo:d.profileURL||"" };
+  // ตรวจ role ก่อนให้เข้า
+  const prof=await authFetchProfile(d.access_token);
+  const {roles,photo,name}=profileParts(prof, base);
+  if(!roles.some(r=>REQUIRED_ROLE.test(r))) throw new Error("บัญชีนี้ไม่มีสิทธิ์เข้าระบบ — ต้องมี role “Windsor Admin”");
+  authSet({ ...base, role:roles.join(", "), photo, name, verified:true });   // เก็บ session เฉพาะเมื่อมีสิทธิ์
 }
 function renderUserChip(s){
   const u=document.getElementById("settingUser");
@@ -2623,8 +2623,8 @@ function renderUserChip(s){
 function doLogout(){ authClear(); location.reload(); }
 function authInit(){
   const s=authGet();
-  if(s){ document.getElementById("loginView").style.display="none"; renderUserChip(s); showLanding(); ensureProfile(); }
-  else { document.getElementById("loginView").style.display="flex"; }
+  if(s && s.verified){ document.getElementById("loginView").style.display="none"; renderUserChip(s); showLanding(); }
+  else { if(s) authClear(); document.getElementById("loginView").style.display="flex"; }   // session เก่า/ไม่ผ่าน role → บังคับ login ใหม่
 }
 document.getElementById("loginForm").onsubmit=async e=>{
   e.preventDefault();
