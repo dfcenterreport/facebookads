@@ -2583,9 +2583,16 @@ async function authFetchProfile(token){
   if(!res.ok) throw new Error("ตรวจสอบสิทธิ์ไม่สำเร็จ");
   return await res.json();
 }
+function extractRoles(d){
+  const p=(d&&d.profile)||{};
+  let raw = (d&&(d.userRole||d.roles)) || p.userRole || p.roles || [];
+  if(typeof raw==="string") raw=[raw];
+  if(!Array.isArray(raw)) raw=[raw];
+  return raw.map(x=> (x==null)?"" : (typeof x==="string"?x : (x.name||x.roleName||x.role||x.title||x.userRole||String(x))) ).filter(Boolean);
+}
 function profileParts(d, fallback){
   const p=(d&&d.profile)||{};
-  const roles=Array.isArray(d&&d.userRole)?d.userRole.filter(Boolean):[];
+  const roles=extractRoles(d);
   let photo=p.profileURL||fallback.photo||"";
   if(!photo && p.wazzupPhotoBase64){ const b=p.wazzupPhotoBase64; photo=b.startsWith("data:")?b:("data:image/"+String(p.wazzupPhotoFileType||"png").replace(/^\./,"")+";base64,"+b); }
   return { roles, photo, name:p.empEngName||p.empThaiName||fallback.name };
