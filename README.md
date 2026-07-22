@@ -2,39 +2,70 @@
 
 Dashboard แสดงผลข้อมูลโฆษณา (Facebook / TikTok / Twitter) จาก [Windsor.ai](https://windsor.ai)
 
-## รูปแบบการดึงข้อมูล (Pull Data → ฐานข้อมูล)
-เว็บ **ไม่ได้ยิง Windsor ตอนเปิดอีกต่อไป** — จะอ่านจากฐานข้อมูลที่ดึงเก็บไว้ (โหลดเร็วขึ้น)
+## สแต็ก (v2 — restructure)
+- **Vite + React** — โค้ดหน้าเว็บแยกเป็น component อยู่ใน `src/`
+- **Tailwind CSS v4** (`@tailwindcss/vite`) + **shadcn/ui** (สไตล์ new-york, ตั้งค่าไว้ใน `components.json`)
+  - สี CI (เหลือง/เทา/ขาว) ถูก map เข้า Tailwind theme แล้ว (`bg-primary` = เหลือง CI ฯลฯ)
+  - CSS เดิมทั้งหมดยังอยู่ใน `src/index.css` เพื่อให้หน้าตาเหมือนเดิม 100% — ค่อยๆ ทยอยแปลงเป็น utility/component ได้
+- **Express** (`server.js`) — proxy `/api/windsor`, `/api/apify`, `/api/img` + เสิร์ฟไฟล์ build จาก `dist/`
+- **Chart.js** — bundle ผ่าน npm (ไม่โหลดจาก CDN แล้ว)
 
-1. เข้าเมนู **⚙️ Setting → ⤓ Pull Data** (มุมบนขวา)
-2. เลือกปีที่จะเริ่มดึง (ค่าเริ่มต้น = **2025**) แล้วกด **เริ่มดึงข้อมูล**
-3. ระหว่างดึงจะมี **progress bar + ประมาณเวลาที่เหลือ (ETA)** และมี **ประวัติการดึง** แสดงด้านล่าง
+## โครงสร้างโปรเจกต์
+```
+├─ index.html              ← entry ของ Vite
+├─ vite.config.mjs         ← alias @ → src, dev proxy /api → :3000
+├─ components.json         ← config ของ shadcn/ui (npx shadcn@latest add <component>)
+├─ server.js               ← Express proxy + เสิร์ฟ dist/
+└─ src/
+   ├─ main.jsx / App.jsx   ← root + top nav + สลับแท็บ
+   ├─ index.css            ← Tailwind + design tokens + สไตล์เดิม
+   ├─ lib/
+   │  ├─ windsor.js        ← wfetch / ensureKey / ค่าคงที่ field / Apify
+   │  ├─ format.js         ← ตัว format ตัวเลข/วันที่
+   │  ├─ benchmark.js      ← กติกา parse ชื่อแคมเปญ (Brand/Objective/Material)
+   │  └─ utils.js          ← cn() ของ shadcn
+   ├─ components/          ← ChartCanvas, Pills, DateRange, MultiSelect, KpiCard, RecoList
+   │  └─ ui/               ← shadcn components (button, card, input, badge)
+   └─ views/
+      ├─ Landing.jsx       ← เลือก Ad Account
+      ├─ Dashboard.jsx     ← KPI + trend + ตารางแคมเปญ
+      ├─ CreativeReport.jsx← Biddable Creative Monitor + drawer + AI reco
+      ├─ Benchmark.jsx     ← FB/TT Cost per & Result Rate + Google embed
+      └─ ActiveAccounts.jsx← สถานะบัญชี + weekly/quarterly trend
+```
 
-Pull job จะดึง connector `all`, `facebook`, `tiktok`, `facebook_organic` แบบเดือนต่อเดือน
-ตั้งแต่ 1 ม.ค. ของปีที่เลือกจนถึงวันนี้ แล้วเก็บเป็นไฟล์ใน `DATA_DIR`
+## รันบนเครื่อง (dev)
+ต้องมี Node.js >= 20
+
+```bash
+npm install
+npm run dev        # vite dev server (hot reload) — proxy /api ไปที่ :3000
+node server.js     # (อีก terminal) Express proxy — ต้องตั้ง env Windsor_key
+```
+
+## Build + รันแบบ production
+```bash
+npm run build      # ได้ dist/
+npm start          # node server.js — เสิร์ฟ dist/ + /api proxy
+```
 
 ## การ deploy (Railway)
-ต้องรันเป็น **Node server** (`node server.js`) — ไม่ใช่ static เพราะต้องมีฐานข้อมูล
+Railway (Nixpacks) จะรัน `npm install` → `npm run build` → `npm start` ให้อัตโนมัติ
 ตั้ง environment variables:
 
 | ตัวแปร | ค่า | หมายเหตุ |
 |--------|-----|----------|
-| `Windsor_key` | API key ของ Windsor | ใช้ตอน Pull Data (ไม่ commit) |
-| `DATA_DIR` | `/data` | path ของ **Railway Volume** (ให้ข้อมูลอยู่ถาวรข้าม redeploy) |
+| `Windsor_key` | API key ของ Windsor | ใช้ฝั่ง server เท่านั้น (ไม่ commit) |
 | `Apify_key` | (ถ้าใช้) | สำหรับ engagement scraping ใน Creative Report |
-
-**สำคัญ:** ต้องเพิ่ม **Volume** ใน Railway แล้ว mount ไว้ที่ `/data` (ให้ตรงกับ `DATA_DIR`)
-มิฉะนั้นข้อมูลที่ Pull ไว้จะหายทุกครั้งที่ redeploy → ต้องกด Pull ใหม่
-
-รันในเครื่อง: `npm install && node server.js` ( default `DATA_DIR=./data`)
+| `DATA_DIR` | `/data` | ใช้เฉพาะถ้าเปิดระบบ Pull Data (endpoint ยังอยู่ใน server.js) |
 
 ## ฟีเจอร์
-- KPI cards: Spend, Impressions, Reach, Clicks, CPM, CPC, CTR
-- กราฟแนวโน้มรายวัน (Spend + Impressions)
-- สัดส่วน Spend ตาม source
-- เปรียบเทียบรายสัปดาห์ (Week-over-Week)
-- ตาราง performance รายแคมเปญ (จัดเรียงได้)
-- ตัวกรองช่วงเวลา + เปิด/ปิด source
+- Landing เลือก Ad Account + ยอด Spend 7 วัน
+- Dashboard: KPI cards (Spend / Reach / Impressions / Clicks / CPM / CPC / CTR / Frequency) + กราฟแนวโน้ม + ตารางแคมเปญกดดูรายวันได้
+- Creative Report: รวมครีเอทีฟตามโพสต์ + drawer "Performance for your post" (Page Insights + Apify) + AI Recommendation
+- Ad Benchmark: Cost per Result / Result Rate แยกตามแบรนด์ (FB + TikTok, heatmap ต่อคอลัมน์) + Google Looker Studio embed
+- Active Ad account: สถานะบัญชี + Weekly Spend Trend + Quarterly Budget Comparison
 
 ## ⚠️ หมายเหตุด้านความปลอดภัย
-Windsor API key ไม่ได้ฝังในไฟล์ — ผู้ใช้กรอกเองตอนเปิด แล้วเก็บใน localStorage ของเบราว์เซอร์
-แนะนำให้ใช้ key ที่จำกัดสิทธิ์ และ regenerate เป็นระยะใน Windsor.ai
+Windsor API key ไม่ได้ฝังในไฟล์ — โหมด production ใช้ key จาก env ฝั่ง server เท่านั้น
+(เปิดไฟล์แบบ file:// เท่านั้นที่จะถามเก็บ key ใน localStorage)

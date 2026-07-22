@@ -430,7 +430,8 @@ app.get("/api/auth/profile", async (req, res) => {
   } catch (e) { res.status(502).json({ error: "profile proxy failed" }); }
 });
 
-app.use(express.static(__dirname));
-app.get("*", (_req, res) => res.sendFile(path.join(__dirname, "index.html")));
+// serve ไฟล์ build ของ Vite (dist/) — ตอน dev ใช้ `npm run dev` (vite จะ proxy /api มาที่ server นี้)
+app.use(express.static(path.join(__dirname, "dist")));
+app.get("*", (_req, res) => res.sendFile(path.join(__dirname, "dist", "index.html")));
 
 app.listen(PORT, () => console.log("Windsor dashboard listening on :" + PORT + " · DATA_DIR=" + DATA_DIR));
