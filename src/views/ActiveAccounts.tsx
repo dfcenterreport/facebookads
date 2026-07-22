@@ -2,10 +2,10 @@ import { useEffect, useMemo, useState } from "react";
 import { wfetch, ensureKey } from "@/lib/windsor";
 import { acctOf, addDays, weekStart, fmtMoney } from "@/lib/format";
 import { cn } from "@/lib/utils";
-import Pills from "@/components/Pills.jsx";
-import DateRange from "@/components/DateRange.jsx";
-import { Trend } from "@/components/KpiCard.jsx";
-import ChartCanvas, { yellowGradient } from "@/components/ChartCanvas.jsx";
+import Pills from "@/components/Pills";
+import DateRange from "@/components/DateRange";
+import { Trend } from "@/components/KpiCard";
+import ChartCanvas, { yellowGradient } from "@/components/ChartCanvas";
 
 const PRESET_LABEL = { last_7d: "7 วัน", last_14d: "14 วัน", last_30d: "30 วัน", this_month: "เดือนนี้", last_month: "เดือนก่อน", custom: "ช่วงที่เลือก" };
 const PRESETS = [

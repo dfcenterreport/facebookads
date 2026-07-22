@@ -2,10 +2,10 @@ import { useEffect, useMemo, useState } from "react";
 import { wfetch, ensureKey, USE_PROXY, SRC_COLORS, FIELDS, PREV_FIELDS } from "@/lib/windsor";
 import { acctOf, norm, addDays, fmtInt, fmtMoney, fmtPct, sumOf, deriv } from "@/lib/format";
 import { cn } from "@/lib/utils";
-import Pills from "@/components/Pills.jsx";
-import DateRange from "@/components/DateRange.jsx";
-import KpiCard from "@/components/KpiCard.jsx";
-import ChartCanvas, { yellowGradient } from "@/components/ChartCanvas.jsx";
+import Pills from "@/components/Pills";
+import DateRange from "@/components/DateRange";
+import KpiCard from "@/components/KpiCard";
+import ChartCanvas, { yellowGradient } from "@/components/ChartCanvas";
 
 const PRESETS = [
   { value: "last_7d", label: "7 วัน" },

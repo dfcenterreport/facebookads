@@ -2,12 +2,16 @@
   "name": "windsor-dashboard",
   "version": "2.0.0",
   "private": true,
-  "description": "Windsor media dashboard (Vite + React + Tailwind CSS + shadcn/ui, Node proxy server)",
+  "description": "Windsor media dashboard (Vite + React + TypeScript + Tailwind CSS + shadcn/ui, Node/Express API)",
   "scripts": {
     "dev": "vite",
-    "build": "vite build",
+    "dev:server": "tsx watch api/index.ts",
+    "build": "vite build && tsc -p tsconfig.server.json",
+    "build:web": "vite build",
+    "build:server": "tsc -p tsconfig.server.json",
+    "start": "node dist-server/index.js",
     "preview": "vite preview",
-    "start": "node server.js"
+    "typecheck": "tsc --noEmit -p tsconfig.json && tsc --noEmit -p tsconfig.server.json"
   },
   "dependencies": {
     "chart.js": "^4.4.1",
@@ -21,8 +25,14 @@
   },
   "devDependencies": {
     "@tailwindcss/vite": "^4.0.0",
+    "@types/express": "^4.17.21",
+    "@types/node": "^20.19.0",
+    "@types/react": "^18.3.18",
+    "@types/react-dom": "^18.3.5",
     "@vitejs/plugin-react": "^4.3.4",
     "tailwindcss": "^4.0.0",
+    "tsx": "^4.19.2",
+    "typescript": "^5.7.2",
     "vite": "^6.0.7"
   },
   "engines": {

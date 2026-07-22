@@ -1,12 +1,12 @@
 import { useEffect, useState } from "react";
 import { cn } from "@/lib/utils";
 import { doLogout } from "@/lib/auth";
-import LoginGate from "@/components/LoginGate.jsx";
-import Landing from "@/views/Landing.jsx";
-import Dashboard from "@/views/Dashboard.jsx";
-import CreativeReport from "@/views/CreativeReport.jsx";
-import Benchmark from "@/views/Benchmark.jsx";
-import ActiveAccounts from "@/views/ActiveAccounts.jsx";
+import LoginGate from "@/components/LoginGate";
+import Landing from "@/views/Landing";
+import Dashboard from "@/views/Dashboard";
+import CreativeReport from "@/views/CreativeReport";
+import Benchmark from "@/views/Benchmark";
+import ActiveAccounts from "@/views/ActiveAccounts";
 
 const TABS = [
   { key: "app", label: "Dashboard" },

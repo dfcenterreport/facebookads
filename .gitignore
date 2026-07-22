@@ -5,8 +5,9 @@ _stitch_fb/
 *.zip
 node_modules/
 
-# vite build output
+# build output
 dist/
+dist-server/
 
 # runtime data store (Pull Data → เก็บบน volume ฝั่ง production)
 data/

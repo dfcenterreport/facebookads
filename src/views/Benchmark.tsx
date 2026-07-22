@@ -2,10 +2,10 @@ import { useEffect, useMemo, useState } from "react";
 import { wfetch, ensureKey } from "@/lib/windsor";
 import { acctOf, fmtMoney } from "@/lib/format";
 import { BENCH_BASE, BENCH_OPT_TIERS, TT_TIERS, G_PAGE, gEmbedUrl, gOpenUrl, parseCampaign, parseCampaignTT, bnum, bstat } from "@/lib/benchmark";
-import Pills from "@/components/Pills.jsx";
-import DateRange from "@/components/DateRange.jsx";
-import MultiSelect from "@/components/MultiSelect.jsx";
-import RecoList from "@/components/RecoList.jsx";
+import Pills from "@/components/Pills";
+import DateRange from "@/components/DateRange";
+import MultiSelect from "@/components/MultiSelect";
+import RecoList from "@/components/RecoList";
 
 const MODES = [
   { value: "cost", label: "FB Cost per" },
