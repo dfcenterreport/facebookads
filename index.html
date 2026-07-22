@@ -367,9 +367,40 @@
   .acct-meta .spend{font-family:'JetBrains Mono',monospace;font-size:14px;font-weight:700;color:var(--ink)}
   .acct-meta .cap{font-size:11px;color:var(--muted);margin-top:2px}
   .land-note{display:flex;gap:10px;background:#fef6cf;border-radius:8px;padding:14px 16px;font-size:13px;color:#6f5b00;margin-top:18px}
+  /* ===== Login gate ===== */
+  .login-view{position:fixed;inset:0;z-index:2000;display:none;align-items:center;justify-content:center;background:linear-gradient(135deg,#fffdf5,#f4f5f6);padding:20px}
+  .login-card{width:100%;max-width:380px;background:var(--surface);border:1px solid var(--border);border-radius:14px;box-shadow:0 12px 40px rgba(16,24,40,.12);padding:32px 28px}
+  .login-brand{font-family:'Hanken Grotesk','Noto Sans Thai',sans-serif;font-weight:700;font-size:22px;color:var(--ink)}
+  .login-sub{color:var(--muted);font-size:13px;margin:6px 0 22px}
+  .login-card form{display:flex;flex-direction:column;gap:14px}
+  .login-card label{display:flex;flex-direction:column;gap:6px;font-size:12px;font-weight:600;color:var(--muted)}
+  .login-card input{font-size:14px;padding:11px 12px;border:1px solid var(--gray);border-radius:8px}
+  .login-card input:focus{outline:none;border:2px solid var(--yellow);padding:10px 11px}
+  .login-card .btn-primary{padding:12px;font-size:15px;border-radius:8px;margin-top:4px}
+  .login-err{background:#fff5f5;border:1px solid var(--bad);color:var(--bad);border-radius:8px;padding:9px 11px;font-size:13px}
+  .login-foot{margin-top:16px;font-size:11px;color:var(--muted);text-align:center}
+  /* user chip in setting menu */
+  .setting-user{padding:10px 14px;border-bottom:1px solid var(--border);font-size:12px}
+  .setting-user b{display:block;color:var(--ink);font-size:13px}
+  .setting-user span{color:var(--muted)}
 </style>
 </head>
 <body>
+
+<!-- ===================== LOGIN GATE ===================== -->
+<div class="login-view" id="loginView">
+  <div class="login-card">
+    <div class="login-brand">📊 Windsor Media</div>
+    <div class="login-sub">เข้าสู่ระบบด้วยบัญชี Wazzup / Fareast Fameline</div>
+    <form id="loginForm" autocomplete="on">
+      <label>Username<input id="loginUser" autocomplete="username" required></label>
+      <label>Password<input id="loginPass" type="password" autocomplete="current-password" required></label>
+      <div id="loginErr" class="login-err" style="display:none"></div>
+      <button type="submit" id="loginBtn" class="btn-primary">เข้าสู่ระบบ</button>
+    </form>
+    <div class="login-foot">เฉพาะพนักงานที่มีสิทธิ์เข้าถึงเท่านั้น</div>
+  </div>
+</div>
 
 <nav class="topnav" id="topNav">
   <div class="topnav-brand">📊 Windsor Media</div>
@@ -383,11 +414,14 @@
     <div class="setting-menu" id="settingMenu">
       <div class="setting-btn" id="settingBtn">⚙️ Setting <span class="setting-caret">▾</span></div>
       <div class="setting-panel">
+        <div class="setting-user" id="settingUser" style="display:none"><b id="settingUserName">—</b><span id="settingUserPos"></span></div>
         <div class="setting-item" data-act="pull">⤓ Pull Data</div>
         <div class="setting-sep"></div>
         <div class="setting-item" data-act="key">🔑 API Key</div>
         <div class="setting-item" data-act="refresh">↻ รีเฟรชข้อมูล</div>
         <div class="setting-item" data-act="clearcache">🗑️ ล้าง Cache</div>
+        <div class="setting-sep"></div>
+        <div class="setting-item" data-act="logout">🚪 ออกจากระบบ</div>
       </div>
     </div>
   </div>
@@ -2316,6 +2350,7 @@ document.getElementById("topNav").onclick=e=>{
       Object.keys(localStorage).forEach(k=>{ if(k.startsWith("benchcache_")){ localStorage.removeItem(k); n++; } });
       alert(n ? `ล้าง cache แล้ว ${n} รายการ` : "ไม่มี cache ให้ล้าง");
     }
+    else if(act==="logout"){ if(confirm("ออกจากระบบ?")) doLogout(); }
   };
 })();
 
@@ -2517,7 +2552,54 @@ document.getElementById("benchModeTabs").onclick=e=>{
 // ปิด panel multi-select เมื่อคลิกนอกกล่อง
 document.addEventListener("click",e=>{ document.querySelectorAll(".ms.open").forEach(ms=>{ if(!ms.contains(e.target)) ms.classList.remove("open"); }); });
 
-showLanding();
+/* ============================================================
+   LOGIN GATE — Wazzup / Fareast Fameline (skill: wazzup-authentication)
+   ============================================================ */
+const AUTH_KEY="wz_session";
+function authGet(){
+  try{ const s=JSON.parse(sessionStorage.getItem(AUTH_KEY)); if(!s||!s.access_token) return null;
+    if(s.expiration && new Date(s.expiration).getTime() < Date.now()){ sessionStorage.removeItem(AUTH_KEY); return null; }
+    return s; }catch(e){ return null; }
+}
+function authSet(s){ try{ sessionStorage.setItem(AUTH_KEY, JSON.stringify(s)); }catch(e){} }
+function authClear(){ try{ sessionStorage.removeItem(AUTH_KEY); }catch(e){} }
+async function authLogin(user, pass){
+  const ep = USE_PROXY ? "/api/auth/login" : "https://api.fareastfamelineddb.com/api/User/Authentication";
+  const res = await fetch(ep, { method:"POST", headers:{"Content-Type":"application/json"},
+    body: JSON.stringify({ authenticationName:user, authenticationPassword:pass }) });
+  if(res.status===401) throw new Error("ชื่อผู้ใช้หรือรหัสผ่านไม่ถูกต้อง");
+  if(!res.ok) throw new Error("เข้าสู่ระบบไม่สำเร็จ กรุณาลองใหม่");
+  let d; try{ d=await res.json(); }catch(e){ throw new Error("เข้าสู่ระบบไม่สำเร็จ"); }
+  if(!d || !d.access_token) throw new Error("เข้าสู่ระบบไม่สำเร็จ");
+  authSet({ access_token:d.access_token, expiration:d.expiration||null,
+    name:d.empEngName||d.empThaiName||user, position:d.positionName||"", dept:d.departmentName||"" });
+  return d;
+}
+function renderUserChip(s){
+  const u=document.getElementById("settingUser"); if(!u) return;
+  document.getElementById("settingUserName").textContent=s.name||"—";
+  document.getElementById("settingUserPos").textContent=[s.position,s.dept].filter(Boolean).join(" · ");
+  u.style.display="block";
+}
+function doLogout(){ authClear(); location.reload(); }
+function authInit(){
+  const s=authGet();
+  if(s){ document.getElementById("loginView").style.display="none"; renderUserChip(s); showLanding(); }
+  else { document.getElementById("loginView").style.display="flex"; }
+}
+document.getElementById("loginForm").onsubmit=async e=>{
+  e.preventDefault();
+  const btn=document.getElementById("loginBtn"), err=document.getElementById("loginErr"), orig=btn.textContent;
+  err.style.display="none"; btn.disabled=true; btn.textContent="กำลังเข้าสู่ระบบ…";
+  try{
+    await authLogin(document.getElementById("loginUser").value.trim(), document.getElementById("loginPass").value);
+    document.getElementById("loginPass").value="";   // ไม่เก็บรหัสผ่าน
+    authInit();
+  }catch(ex){ err.textContent=ex.message; err.style.display="block"; }
+  finally{ btn.disabled=false; btn.textContent=orig; }
+};
+
+authInit();
 </script>
 </body>
 </html>

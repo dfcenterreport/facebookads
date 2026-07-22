@@ -413,6 +413,23 @@ app.get("/api/img", async (req, res) => {
   }
 });
 
+// ---------- API: auth proxy (Wazzup / Fareast Fameline identity) — เลี่ยง CORS ----------
+const AUTH_BASE = process.env.WAZZUP_BASE || "https://api.fareastfamelineddb.com";
+app.post("/api/auth/login", async (req, res) => {
+  try {
+    const r = await fetch(`${AUTH_BASE}/api/User/Authentication`, {
+      method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify(req.body || {}),
+    });
+    res.status(r.status).type("application/json").send(await r.text());
+  } catch (e) { res.status(502).json({ error: "auth proxy failed" }); }
+});
+app.get("/api/auth/profile", async (req, res) => {
+  try {
+    const r = await fetch(`${AUTH_BASE}/api/User/Profile`, { headers: { Authorization: req.header("authorization") || "" } });
+    res.status(r.status).type("application/json").send(await r.text());
+  } catch (e) { res.status(502).json({ error: "profile proxy failed" }); }
+});
+
 app.use(express.static(__dirname));
 app.get("*", (_req, res) => res.sendFile(path.join(__dirname, "index.html")));
 
