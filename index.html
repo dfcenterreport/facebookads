@@ -2603,7 +2603,7 @@ async function authLogin(user, pass){
   // ตรวจ role ก่อนให้เข้า
   const prof=await authFetchProfile(d.access_token);
   const {roles,photo,name}=profileParts(prof, base);
-  if(!roles.some(r=>REQUIRED_ROLE.test(r))) throw new Error("บัญชีนี้ไม่มีสิทธิ์เข้าระบบ — ต้องมี role “Windsor Admin”");
+  if(!roles.some(r=>REQUIRED_ROLE.test(r))) throw new Error("บัญชีนี้ไม่มีสิทธิ์เข้าระบบ (ต้องมี role Windsor Admin) · role ที่พบ: " + (roles.length?roles.join(" | "):"(ไม่มี role)"));
   authSet({ ...base, role:roles.join(", "), photo, name, verified:true });   // เก็บ session เฉพาะเมื่อมีสิทธิ์
 }
 function renderUserChip(s){
